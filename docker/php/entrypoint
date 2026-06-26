@@ -1,0 +1,66 @@
+#!/bin/bash
+set -e
+
+APP_DIR=/var/www/html
+STORAGE_DIR="$APP_DIR/storage"
+CACHE_DIR="$APP_DIR/bootstrap/cache"
+
+# APP_ROLE controls what this container does at startup:
+#   app    → wait for DB, run migrations, warm caches, then start php-fpm
+#   worker → wait for DB, then exec the given command (queue, scheduler)
+#   reverb → skip DB wait, exec the given command immediately
+APP_ROLE="${APP_ROLE:-app}"
+
+main() {
+    prepare_dirs
+
+    if [ "$APP_ROLE" != "reverb" ]; then
+        wait_for_db
+    fi
+
+    if [ "$APP_ROLE" = "app" ]; then
+        run_migrations
+        warm_caches
+    fi
+
+    exec "$@"
+}
+
+prepare_dirs() {
+    mkdir -p \
+        "$STORAGE_DIR/app/public" \
+        "$STORAGE_DIR/framework/cache/data" \
+        "$STORAGE_DIR/framework/sessions" \
+        "$STORAGE_DIR/framework/views" \
+        "$CACHE_DIR"
+
+    chown -R www-data:www-data "$STORAGE_DIR" "$CACHE_DIR"
+    chmod -R 775 "$STORAGE_DIR" "$CACHE_DIR"
+
+    if [ ! -L "$APP_DIR/public/storage" ]; then
+        php artisan storage:link --force
+    fi
+}
+
+wait_for_db() {
+    echo "[entrypoint] Waiting for PostgreSQL at $DB_HOST:${DB_PORT:-5432}…"
+    until pg_isready -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USERNAME" -d "$DB_DATABASE" -q; do
+        sleep 1
+    done
+    echo "[entrypoint] PostgreSQL is ready."
+}
+
+run_migrations() {
+    echo "[entrypoint] Running migrations…"
+    php artisan migrate --force
+}
+
+warm_caches() {
+    echo "[entrypoint] Warming caches…"
+    php artisan config:cache
+    php artisan route:cache
+    php artisan event:cache
+    php artisan view:cache
+}
+
+main "$@"

@@ -1,0 +1,197 @@
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chistulya/app:latest
+    container_name: chistulya_app
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      APP_ROLE: app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    networks:
+      - chistulya
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t 2>&1 | grep -q 'NOTICE: configuration file'"]
+      start_period: 90s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: chistulya_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - chistulya
+    depends_on:
+      app:
+        condition: service_healthy
+      reverb:
+        condition: service_healthy
+
+  queue:
+    image: chistulya/app:latest
+    container_name: chistulya_queue
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      APP_ROLE: worker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    networks:
+      - chistulya
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+
+  scheduler:
+    image: chistulya/app:latest
+    container_name: chistulya_scheduler
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      APP_ROLE: worker
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    networks:
+      - chistulya
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["php", "artisan", "schedule:work"]
+
+  reverb:
+    image: chistulya/app:latest
+    container_name: chistulya_reverb
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      APP_ROLE: reverb
+    volumes:
+      - app_storage:/var/www/html/storage/app
+    networks:
+      - chistulya
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      start_period: 15s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: chistulya_postgres
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - chistulya
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$DB_USERNAME -d $$DB_DATABASE"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  redis:
+    image: redis:7-alpine
+    container_name: chistulya_redis
+    restart: unless-stopped
+    env_file: .env.production
+    command: >
+      sh -c "redis-server
+        --appendonly yes
+        --requirepass $$REDIS_PASSWORD
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chistulya
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: chistulya_minio
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - chistulya
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: chistulya_minio_init
+    restart: "no"
+    env_file: .env.production
+    entrypoint: ["sh", "/minio-setup.sh"]
+    volumes:
+      - ./docker/minio-setup.sh:/minio-setup.sh:ro
+    networks:
+      - chistulya
+    depends_on:
+      minio:
+        condition: service_healthy
+
+networks:
+  chistulya:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  app_storage:

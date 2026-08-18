@@ -28,7 +28,7 @@ class AdminUpdatePetItemMutation extends AdminMutation
     {
         return [
             'id' => ['type' => Type::nonNull(Type::string())],
-            'category_id' => ['type' => Type::string()],
+            'category_id' => ['type' => Type::int()],
             'title' => ['type' => Type::string()],
             'short_description' => ['type' => Type::string()],
             'description' => ['type' => Type::string()],
@@ -65,18 +65,18 @@ class AdminUpdatePetItemMutation extends AdminMutation
 
             $fields = array_filter(
                 array_intersect_key($args, array_flip(['category_id', 'title', 'short_description', 'description', 'is_available', 'price'])),
-                static fn($v) => $v !== null,
+                static fn ($v) => $v !== null,
             );
 
             if (array_key_exists('requirements', $args)) {
                 $fields['requirements'] = $this->parseRequirements($args['requirements']);
             }
 
-            if (!empty($fields)) {
+            if (! empty($fields)) {
                 $item->forceFill($fields)->save();
             }
 
-            if (!empty($args['media_id'])) {
+            if (! empty($args['media_id'])) {
                 $media = Media::whereKey($args['media_id'])->firstOrFail();
                 app(MediaService::class)->attachToEntity($media, $item);
             }

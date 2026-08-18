@@ -29,12 +29,12 @@ class DailyTaskType extends GraphQLType
             'scope' => [
                 'type' => Type::nonNull(Type::string()),
                 'description' => 'Raw scope value. Admin use only — clients should use the `source` field instead.',
-                'resolve' => static fn(DailyTask $task): string => $task->scope->value,
+                'resolve' => static fn (DailyTask $task): string => $task->scope->value,
             ],
             'source' => [
                 'type' => Type::nonNull(Type::string()),
                 'description' => 'How this task was made available: "global" (system task for all children) or "custom" (created by a parent or admin for specific children).',
-                'resolve' => static fn(DailyTask $task): string => match ($task->scope) {
+                'resolve' => static fn (DailyTask $task): string => match ($task->scope) {
                     DailyTaskScope::GLOBAL => 'global',
                     default => 'custom',
                 },
@@ -57,8 +57,9 @@ class DailyTaskType extends GraphQLType
                 },
             ],
             'category_id' => [
-                'type' => Type::nonNull(Type::string()),
+                'type' => Type::nonNull(Type::int()),
                 'description' => 'ID of the task category.',
+                'resolve' => static fn (DailyTask $task): int => (int) $task->category_id,
             ],
             'category' => [
                 'type' => GraphQL::type('DailyTaskCategory'),
@@ -79,7 +80,7 @@ class DailyTaskType extends GraphQLType
             'media' => [
                 'type' => Type::listOf(GraphQL::type('Media')),
                 'description' => 'Uploaded media for this task.',
-                'resolve' => static fn(DailyTask $task): Collection => $task->media,
+                'resolve' => static fn (DailyTask $task): Collection => $task->media,
             ],
             'reward_xp' => [
                 'type' => Type::nonNull(Type::int()),

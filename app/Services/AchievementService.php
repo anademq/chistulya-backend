@@ -12,6 +12,7 @@ use App\Models\Child\ChildAchievement;
 use App\Models\Child\ChildChallenge;
 use App\Models\Child\ChildDailyTask;
 use App\Models\User;
+use App\Support\ExistingRecord;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -108,11 +109,14 @@ class AchievementService
     public function claim(User $child, string $achievementId): array
     {
         return DB::transaction(function () use ($child, $achievementId): array {
-            $childAchievement = ChildAchievement::lockForUpdate()
-                ->where('achievement_id', $achievementId)
-                ->where('child_id', $child->id)
-                ->with('achievement')
-                ->firstOrFail();
+            $childAchievement = ExistingRecord::require(
+                ChildAchievement::lockForUpdate()
+                    ->where('achievement_id', $achievementId)
+                    ->where('child_id', $child->id)
+                    ->with('achievement')
+                    ->first(),
+                'achievement_id',
+            );
 
             if (! $childAchievement->canClaimReward()) {
                 throw ValidationException::withMessages([
@@ -140,7 +144,7 @@ class AchievementService
     }
 
     /**
-     * @param  array<string, int>  $completedTaskIds   task_id => position (flip of pluck)
+     * @param  array<string, int>  $completedTaskIds  task_id => position (flip of pluck)
      * @param  array<string, int>  $completedChallengeIds  challenge_id => position (flip of pluck)
      */
     private function isCompletedByChild(

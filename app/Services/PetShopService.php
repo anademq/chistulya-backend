@@ -9,6 +9,7 @@ use App\Models\PetItem;
 use App\Models\PetItemCategory;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Support\ExistingRecord;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +28,10 @@ class PetShopService
     public function purchase(User $child, string $petItemId): ChildPetItem
     {
         return DB::transaction(function () use ($child, $petItemId): ChildPetItem {
-            $petItem = PetItem::available()->whereKey($petItemId)->firstOrFail();
+            $petItem = ExistingRecord::require(
+                PetItem::available()->whereKey($petItemId)->first(),
+                'pet_item_id',
+            );
 
             $requirements = $petItem->requirements ?? [];
 
@@ -73,11 +77,14 @@ class PetShopService
     public function equip(User $child, string $petItemId): ChildPetItem
     {
         return DB::transaction(function () use ($child, $petItemId): ChildPetItem {
-            $childItem = ChildPetItem::lockForUpdate()
-                ->where('pet_item_id', $petItemId)
-                ->where('child_id', $child->id)
-                ->with('petItem')
-                ->firstOrFail();
+            $childItem = ExistingRecord::require(
+                ChildPetItem::lockForUpdate()
+                    ->where('pet_item_id', $petItemId)
+                    ->where('child_id', $child->id)
+                    ->with('petItem')
+                    ->first(),
+                'pet_item_id',
+            );
 
             ChildPetItem::query()
                 ->where('child_id', $child->id)
@@ -92,9 +99,12 @@ class PetShopService
 
     public function unequip(User $child, string $petItemId): ChildPetItem
     {
-        $childItem = ChildPetItem::where('pet_item_id', $petItemId)
-            ->where('child_id', $child->id)
-            ->firstOrFail();
+        $childItem = ExistingRecord::require(
+            ChildPetItem::where('pet_item_id', $petItemId)
+                ->where('child_id', $child->id)
+                ->first(),
+            'pet_item_id',
+        );
 
         $childItem->forceFill(['is_equipped' => false])->save();
 

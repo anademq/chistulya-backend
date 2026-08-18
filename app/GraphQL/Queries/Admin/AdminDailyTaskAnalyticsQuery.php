@@ -13,7 +13,7 @@ class AdminDailyTaskAnalyticsQuery extends AdminQuery
 {
     protected $attributes = [
         'name' => 'dailyTaskAnalytics',
-        'description' => 'Admin: returns daily task completion analytics for a given child over the past N days (max 90). Supports optional filtering by category slug.',
+        'description' => 'Admin: returns daily task completion analytics for a given child over the past N days (max 90). Supports optional filtering by category id.',
     ];
 
     public function type(): Type
@@ -33,9 +33,9 @@ class AdminDailyTaskAnalyticsQuery extends AdminQuery
                 'defaultValue' => 30,
                 'description' => 'Number of past days to include (1–90). Defaults to 30.',
             ],
-            'category' => [
-                'type' => Type::string(),
-                'description' => 'Filter by task category slug.',
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Filter by task category id.',
             ],
         ];
     }
@@ -47,7 +47,7 @@ class AdminDailyTaskAnalyticsQuery extends AdminQuery
         return app(AnalyticsService::class)->dailyTasksByLastDays(
             $child,
             max(1, min(90, (int) ($args['days'] ?? 30))),
-            $args['category'] ?? null
+            isset($args['category_id']) ? (int) $args['category_id'] : null
         );
     }
 }

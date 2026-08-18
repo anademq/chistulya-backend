@@ -9,6 +9,7 @@ use App\Models\Child\ChildDailyTask;
 use App\Models\DailyTask;
 use App\Models\DailyTaskCategory;
 use App\Models\User;
+use App\Support\ExistingRecord;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -17,21 +18,24 @@ use Illuminate\Validation\ValidationException;
 class DailyTaskService
 {
     public const CATEGORIES_CACHE_KEY = 'categories:daily_tasks';
-    public function listAvailable(User $child, int $page, int $perPage = 20): LengthAwarePaginator
+
+    public function listAvailable(User $child, int $page, int $perPage = 20, ?int $categoryId = null): LengthAwarePaginator
     {
         return DailyTask::availableFor($child)
+            ->when($categoryId !== null, fn ($query) => $query->where('category_id', $categoryId))
             ->with(['category', 'media'])
             ->orderBy('title')
             ->paginate($perPage, ['*'], 'page', $page);
     }
 
-    public function listSelected(User $child, int $page, int $perPage = 10): LengthAwarePaginator
+    public function listSelected(User $child, int $page, int $perPage = 10, ?int $categoryId = null): LengthAwarePaginator
     {
         $this->resetStaleForChild($child);
 
         return ChildDailyTask::query()
             ->with('dailyTask')
             ->where('child_id', $child->id)
+            ->when($categoryId !== null, fn ($query) => $query->whereHas('dailyTask', fn ($task) => $task->where('category_id', $categoryId)))
             ->orderByDesc('updated_at')
             ->paginate($perPage, ['*'], 'page', $page);
     }
@@ -90,10 +94,13 @@ class DailyTaskService
 
     public function complete(User $child, string $dailyTaskId): ChildDailyTask
     {
-        $childDailyTask = ChildDailyTask::where('daily_task_id', $dailyTaskId)
-            ->where('child_id', $child->id)
-            ->with('dailyTask.category')
-            ->firstOrFail();
+        $childDailyTask = ExistingRecord::require(
+            ChildDailyTask::where('daily_task_id', $dailyTaskId)
+                ->where('child_id', $child->id)
+                ->with('dailyTask.category')
+                ->first(),
+            'daily_task_id',
+        );
 
         if ($childDailyTask->isCompleted()) {
             throw ValidationException::withMessages([
@@ -123,11 +130,14 @@ class DailyTaskService
     public function claim(User $child, string $dailyTaskId): array
     {
         return DB::transaction(function () use ($child, $dailyTaskId): array {
-            $childDailyTask = ChildDailyTask::lockForUpdate()
-                ->where('daily_task_id', $dailyTaskId)
-                ->where('child_id', $child->id)
-                ->with('dailyTask')
-                ->firstOrFail();
+            $childDailyTask = ExistingRecord::require(
+                ChildDailyTask::lockForUpdate()
+                    ->where('daily_task_id', $dailyTaskId)
+                    ->where('child_id', $child->id)
+                    ->with('dailyTask')
+                    ->first(),
+                'daily_task_id',
+            );
 
             if (! $childDailyTask->canClaimReward()) {
                 throw ValidationException::withMessages([

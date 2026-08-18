@@ -9,6 +9,7 @@ use App\Models\Challenge;
 use App\Models\ChallengeCategory;
 use App\Models\Child\ChildChallenge;
 use App\Models\User;
+use App\Support\ExistingRecord;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -17,21 +18,24 @@ use Illuminate\Validation\ValidationException;
 class ChallengeService
 {
     public const CATEGORIES_CACHE_KEY = 'categories:challenges';
-    public function listAvailable(User $child, int $page, int $perPage = 10): LengthAwarePaginator
+
+    public function listAvailable(User $child, int $page, int $perPage = 10, ?int $categoryId = null): LengthAwarePaginator
     {
         return Challenge::availableFor($child)
+            ->when($categoryId !== null, fn ($query) => $query->where('category_id', $categoryId))
             ->with(['category', 'media'])
             ->orderBy('title')
             ->paginate($perPage, ['*'], 'page', $page);
     }
 
-    public function listSelected(User $child, int $page, int $perPage = 10): LengthAwarePaginator
+    public function listSelected(User $child, int $page, int $perPage = 10, ?int $categoryId = null): LengthAwarePaginator
     {
         $this->syncStaleStatuses($child);
 
         return ChildChallenge::query()
             ->with('challenge')
             ->where('child_id', $child->id)
+            ->when($categoryId !== null, fn ($query) => $query->whereHas('challenge', fn ($challenge) => $challenge->where('category_id', $categoryId)))
             ->orderByDesc('updated_at')
             ->paginate($perPage, ['*'], 'page', $page);
     }
@@ -58,9 +62,12 @@ class ChallengeService
 
     public function start(User $child, string $challengeId): ChildChallenge
     {
-        $childChallenge = ChildChallenge::where('challenge_id', $challengeId)
-            ->where('child_id', $child->id)
-            ->firstOrFail();
+        $childChallenge = ExistingRecord::require(
+            ChildChallenge::where('challenge_id', $challengeId)
+                ->where('child_id', $child->id)
+                ->first(),
+            'challenge_id',
+        );
 
         if (! $childChallenge->isSelected()) {
             throw ValidationException::withMessages([
@@ -75,12 +82,16 @@ class ChallengeService
 
     public function progress(User $child, string $challengeId): ChildChallenge
     {
-        return DB::transaction(function () use ($child, $challengeId): ChildChallenge {
-            $childChallenge = ChildChallenge::lockForUpdate()
-                ->where('challenge_id', $challengeId)
-                ->where('child_id', $child->id)
-                ->with('challenge')
-                ->firstOrFail();
+        /** @var array{child_challenge:ChildChallenge,analytics:?array{type:string,category_id:int,date:Carbon}} $result */
+        $result = DB::transaction(function () use ($child, $challengeId): array {
+            $childChallenge = ExistingRecord::require(
+                ChildChallenge::lockForUpdate()
+                    ->where('challenge_id', $challengeId)
+                    ->where('child_id', $child->id)
+                    ->with('challenge')
+                    ->first(),
+                'challenge_id',
+            );
 
             if (! $childChallenge->isInProgress()) {
                 throw ValidationException::withMessages([
@@ -93,11 +104,14 @@ class ChallengeService
             if ($childChallenge->hasSkippedDay($this->childTimezone($child))) {
                 $childChallenge->forceFill(['status' => ChallengeStatus::FAILED])->save();
 
-                app(AnalyticsService::class)->incrementChallengeFailed($child, $categoryId, now());
-
-                throw ValidationException::withMessages([
-                    'challenge_id' => __('validation.custom.challenge.skipped_day'),
-                ]);
+                return [
+                    'child_challenge' => $childChallenge,
+                    'analytics' => [
+                        'type' => 'failed',
+                        'category_id' => $categoryId,
+                        'date' => now(),
+                    ],
+                ];
             }
 
             $newProgress = $childChallenge->progress_days + 1;
@@ -108,6 +122,7 @@ class ChallengeService
                 'last_progress_at' => now(),
             ];
 
+            $analytics = null;
             $completedAt = null;
 
             if ($newProgress >= $target) {
@@ -119,11 +134,44 @@ class ChallengeService
             $childChallenge->forceFill($payload)->save();
 
             if ($completedAt !== null) {
-                app(AnalyticsService::class)->incrementChallengeCompleted($child, $categoryId, $completedAt);
+                $analytics = [
+                    'type' => 'completed',
+                    'category_id' => $categoryId,
+                    'date' => $completedAt,
+                ];
             }
 
-            return $childChallenge;
+            return [
+                'child_challenge' => $childChallenge,
+                'analytics' => $analytics,
+            ];
         });
+
+        if ($result['analytics'] !== null) {
+            $analytics = app(AnalyticsService::class);
+
+            match ($result['analytics']['type']) {
+                'failed' => $analytics->incrementChallengeFailed(
+                    $child,
+                    $result['analytics']['category_id'],
+                    $result['analytics']['date'],
+                ),
+                'completed' => $analytics->incrementChallengeCompleted(
+                    $child,
+                    $result['analytics']['category_id'],
+                    $result['analytics']['date'],
+                ),
+                default => null,
+            };
+        }
+
+        if ($result['child_challenge']->isFailed()) {
+            throw ValidationException::withMessages([
+                'challenge_id' => __('validation.custom.challenge.skipped_day'),
+            ]);
+        }
+
+        return $result['child_challenge'];
     }
 
     /**
@@ -132,11 +180,14 @@ class ChallengeService
     public function claim(User $child, string $challengeId): array
     {
         return DB::transaction(function () use ($child, $challengeId): array {
-            $childChallenge = ChildChallenge::lockForUpdate()
-                ->where('challenge_id', $challengeId)
-                ->where('child_id', $child->id)
-                ->with('challenge')
-                ->firstOrFail();
+            $childChallenge = ExistingRecord::require(
+                ChildChallenge::lockForUpdate()
+                    ->where('challenge_id', $challengeId)
+                    ->where('child_id', $child->id)
+                    ->with('challenge')
+                    ->first(),
+                'challenge_id',
+            );
 
             if (! $childChallenge->canClaimReward()) {
                 throw ValidationException::withMessages([
@@ -171,7 +222,7 @@ class ChallengeService
     {
         $tz = $this->childTimezone($child);
         $yesterdayStartUtc = now()->setTimezone($tz)->subDay()->startOfDay()->utc()->toDateTimeString();
-        $localMidnightUtc  = now()->setTimezone($tz)->startOfDay()->utc()->toDateTimeString();
+        $localMidnightUtc = now()->setTimezone($tz)->startOfDay()->utc()->toDateTimeString();
 
         // Fail in-progress challenges that skipped a day in local time.
         ChildChallenge::query()

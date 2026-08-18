@@ -9,6 +9,7 @@ use App\Enums\ReminderStatus;
 use App\Models\Child\ChildReminder;
 use App\Models\Reminder;
 use App\Models\User;
+use App\Support\ExistingRecord;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -121,9 +122,12 @@ class ReminderService
      */
     public function activateByChild(User $child, string $reminderId): Reminder
     {
-        $reminder = Reminder::where('id', $reminderId)
-            ->where('created_by', $child->id)
-            ->firstOrFail();
+        $reminder = ExistingRecord::require(
+            Reminder::where('id', $reminderId)
+                ->where('created_by', $child->id)
+                ->first(),
+            'reminder_id',
+        );
 
         $reminder->forceFill([
             'status' => ReminderStatus::Active,
@@ -138,9 +142,12 @@ class ReminderService
      */
     public function completeByChild(User $child, string $reminderId): Reminder
     {
-        $reminder = Reminder::where('id', $reminderId)
-            ->where('created_by', $child->id)
-            ->firstOrFail();
+        $reminder = ExistingRecord::require(
+            Reminder::where('id', $reminderId)
+                ->where('created_by', $child->id)
+                ->first(),
+            'reminder_id',
+        );
 
         $result = $this->complete($reminder);
 
@@ -195,9 +202,12 @@ class ReminderService
 
     public function markNotificationSeen(User $child, int $notificationId): ChildReminder
     {
-        $notification = ChildReminder::where('id', $notificationId)
-            ->where('child_id', $child->id)
-            ->firstOrFail();
+        $notification = ExistingRecord::require(
+            ChildReminder::where('id', $notificationId)
+                ->where('child_id', $child->id)
+                ->first(),
+            'notification_id',
+        );
 
         if (! $notification->isSeen()) {
             $notification->markAsSeen();

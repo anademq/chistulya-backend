@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\GraphQL\Queries;
 
-use App\GraphQL\Queries\AuthedQuery;
 use App\Models\PetItem;
 use App\Services\PetShopService;
 use GraphQL\Type\Definition\Type;
@@ -27,9 +26,9 @@ class PetCatalogQuery extends AuthedQuery
     public function args(): array
     {
         return [
-            'category' => [
-                'type' => Type::string(),
-                'description' => 'Filter items by category slug.',
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Filter items by category ID.',
             ],
             'page' => [
                 'type' => Type::int(),
@@ -48,15 +47,15 @@ class PetCatalogQuery extends AuthedQuery
     {
         $page = max(1, (int) ($args['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($args['per_page'] ?? 10)));
-        $category = (string) ($args['category'] ?? '');
+        $categoryId = isset($args['category_id']) ? (int) $args['category_id'] : null;
         $version = (int) Cache::get(PetShopService::CATALOG_VERSION_KEY, 0);
-        $cacheKey = sprintf('graphql:pet_catalog:v%d:%s:%d:%d', $version, $category !== '' ? $category : 'all', $page, $perPage);
+        $cacheKey = sprintf('graphql:pet_catalog:v%d:%s:%d:%d', $version, $categoryId !== null ? $categoryId : 'all', $page, $perPage);
 
-        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($category, $page, $perPage): LengthAwarePaginator {
+        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($categoryId, $page, $perPage): LengthAwarePaginator {
             $query = PetItem::query()->with('category')->orderBy('title');
 
-            if ($category !== '') {
-                $query->whereHas('category', static fn ($q) => $q->where('slug', $category));
+            if ($categoryId !== null) {
+                $query->where('category_id', $categoryId);
             }
 
             return $query->paginate($perPage, ['*'], 'page', $page);

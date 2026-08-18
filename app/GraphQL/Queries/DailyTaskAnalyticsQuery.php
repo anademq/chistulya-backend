@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\GraphQL\Queries;
 
-use App\GraphQL\Queries\AuthedQuery;
 use App\Models\User;
 use App\Services\AnalyticsService;
 use App\Services\FamilyService;
@@ -31,9 +30,9 @@ class DailyTaskAnalyticsQuery extends AuthedQuery
                 'defaultValue' => 30,
                 'description' => 'Number of past days to include (1–90). Defaults to 30.',
             ],
-            'category' => [
-                'type' => Type::string(),
-                'description' => 'Filter data points by task category slug.',
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Filter data points by task category id.',
             ],
             'child_id' => [
                 'type' => Type::string(),
@@ -49,7 +48,7 @@ class DailyTaskAnalyticsQuery extends AuthedQuery
         return app(AnalyticsService::class)->dailyTasksByLastDays(
             $child,
             max(1, min(90, (int) ($args['days'] ?? 30))),
-            $args['category'] ?? null
+            isset($args['category_id']) ? (int) $args['category_id'] : null
         );
     }
 

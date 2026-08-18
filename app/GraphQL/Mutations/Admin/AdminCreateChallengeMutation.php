@@ -29,7 +29,7 @@ class AdminCreateChallengeMutation extends AdminMutation
     {
         return [
             'scope' => ['type' => Type::nonNull(Type::string())],
-            'category_id' => ['type' => Type::nonNull(Type::string())],
+            'category_id' => ['type' => Type::nonNull(Type::int())],
             'title' => ['type' => Type::nonNull(Type::string())],
             'short_description' => ['type' => Type::string()],
             'description' => ['type' => Type::string()],
@@ -78,7 +78,7 @@ class AdminCreateChallengeMutation extends AdminMutation
                 'duration_days' => (int) ($args['duration_days'] ?? 1),
             ]);
 
-            if (!empty($args['media_id'])) {
+            if (! empty($args['media_id'])) {
                 $media = Media::whereKey($args['media_id'])->firstOrFail();
                 app(MediaService::class)->attachToEntity($media, $challenge);
             }

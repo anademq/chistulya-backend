@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\GraphQL\Queries;
 
-use App\GraphQL\Queries\AuthedQuery;
 use App\Models\User;
 use App\Services\ChallengeService;
 use App\Services\FamilyService;
@@ -41,6 +40,10 @@ class AvailableChallengesQuery extends AuthedQuery
                 'type' => Type::string(),
                 'description' => 'Child UUID. Required when called by a parent on behalf of a child; omit when called directly by the child.',
             ],
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Optional category ID to filter challenges by.',
+            ],
         ];
     }
 
@@ -51,7 +54,8 @@ class AvailableChallengesQuery extends AuthedQuery
         return app(ChallengeService::class)->listAvailable(
             $child,
             max(1, (int) ($args['page'] ?? 1)),
-            max(1, min(100, (int) ($args['per_page'] ?? 10)))
+            max(1, min(100, (int) ($args['per_page'] ?? 10))),
+            isset($args['category_id']) ? (int) $args['category_id'] : null,
         );
     }
 

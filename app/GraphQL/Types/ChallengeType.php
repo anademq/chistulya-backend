@@ -29,12 +29,12 @@ class ChallengeType extends GraphQLType
             'scope' => [
                 'type' => Type::nonNull(Type::string()),
                 'description' => 'Raw scope value. Admin use only — clients should use the `source` field instead.',
-                'resolve' => static fn(Challenge $challenge): string => $challenge->scope->value,
+                'resolve' => static fn (Challenge $challenge): string => $challenge->scope->value,
             ],
             'source' => [
                 'type' => Type::nonNull(Type::string()),
                 'description' => 'How this challenge was made available: "global" (system challenge for all children) or "custom" (created by a parent or admin for specific children).',
-                'resolve' => static fn(Challenge $challenge): string => match ($challenge->scope) {
+                'resolve' => static fn (Challenge $challenge): string => match ($challenge->scope) {
                     ChallengeScope::GLOBAL => 'global',
                     default => 'custom',
                 },
@@ -57,8 +57,9 @@ class ChallengeType extends GraphQLType
                 },
             ],
             'category_id' => [
-                'type' => Type::nonNull(Type::string()),
+                'type' => Type::nonNull(Type::int()),
                 'description' => 'ID of the challenge category.',
+                'resolve' => static fn (Challenge $challenge): int => (int) $challenge->category_id,
             ],
             'category' => [
                 'type' => GraphQL::type('ChallengeCategory'),
@@ -79,7 +80,7 @@ class ChallengeType extends GraphQLType
             'media' => [
                 'type' => Type::listOf(GraphQL::type('Media')),
                 'description' => 'Uploaded media for this challenge.',
-                'resolve' => static fn(Challenge $challenge): Collection => $challenge->media,
+                'resolve' => static fn (Challenge $challenge): Collection => $challenge->media,
             ],
             'reward_xp' => [
                 'type' => Type::nonNull(Type::int()),

@@ -25,13 +25,19 @@ class DailyTaskCategoriesQuery extends AuthedQuery
 
     public function resolve($root, array $args): Collection
     {
-        return Cache::remember(
+        // Cache plain arrays (not Eloquent objects) so a stale/cross-deploy cache
+        // entry can never deserialize into __PHP_Incomplete_Class. Models are
+        // re-hydrated from the cached rows on read.
+        $rows = Cache::remember(
             DailyTaskService::CATEGORIES_CACHE_KEY,
             now()->addDay(),
-            static fn () => DailyTaskCategory::query()
+            static fn (): array => DailyTaskCategory::query()
                 ->orderBy('order_column')
                 ->orderBy('title')
-                ->get(),
+                ->get()
+                ->toArray(),
         );
+
+        return DailyTaskCategory::hydrate($rows);
     }
 }

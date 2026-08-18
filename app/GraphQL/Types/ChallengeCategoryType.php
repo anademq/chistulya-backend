@@ -20,8 +20,9 @@ class ChallengeCategoryType extends GraphQLType
     {
         return [
             'id' => [
-                'type' => Type::nonNull(Type::string()),
+                'type' => Type::nonNull(Type::int()),
                 'description' => 'Unique ID of the category.',
+                'resolve' => static fn (ChallengeCategory $category): int => (int) $category->id,
             ],
             'slug' => [
                 'type' => Type::nonNull(Type::string()),

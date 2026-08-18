@@ -26,8 +26,9 @@ class PetItemType extends GraphQLType
                 'description' => 'Unique UUID identifier of the pet item.',
             ],
             'category_id' => [
-                'type' => Type::nonNull(Type::string()),
+                'type' => Type::nonNull(Type::int()),
                 'description' => 'ID of the item category.',
+                'resolve' => static fn (PetItem $item): int => (int) $item->category_id,
             ],
             'category' => [
                 'type' => GraphQL::type('PetItemCategory'),
@@ -48,7 +49,7 @@ class PetItemType extends GraphQLType
             'media' => [
                 'type' => Type::listOf(GraphQL::type('Media')),
                 'description' => 'Uploaded media for this item.',
-                'resolve' => static fn(PetItem $item): Collection => $item->media,
+                'resolve' => static fn (PetItem $item): Collection => $item->media,
             ],
             'is_available' => [
                 'type' => Type::nonNull(Type::boolean()),

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\GraphQL\Queries;
 
-use App\GraphQL\Queries\AuthedQuery;
 use App\Models\User;
 use App\Services\DailyTaskService;
 use App\Services\FamilyService;
@@ -41,6 +40,10 @@ class AvailableDailyTasksQuery extends AuthedQuery
                 'type' => Type::string(),
                 'description' => 'Child UUID. Required when called by a parent on behalf of a child; omit when called directly by the child.',
             ],
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Optional category ID to filter tasks by.',
+            ],
         ];
     }
 
@@ -49,8 +52,9 @@ class AvailableDailyTasksQuery extends AuthedQuery
         $child = $this->resolveChild($args);
         $page = max(1, (int) ($args['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($args['per_page'] ?? 20)));
+        $categoryId = isset($args['category_id']) ? (int) $args['category_id'] : null;
 
-        return app(DailyTaskService::class)->listAvailable($child, $page, $perPage);
+        return app(DailyTaskService::class)->listAvailable($child, $page, $perPage, $categoryId);
     }
 
     private function resolveChild(array $args): User

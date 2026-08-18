@@ -37,7 +37,7 @@ class AchievementRequirements implements JsonRequirements
 
     public function isSubscriptionRequired(): bool
     {
-        return (bool) $this->subscription ?? false;
+        return $this->subscription;
     }
 
     public function hasDailyTasks(): bool
@@ -78,14 +78,14 @@ class AchievementRequirements implements JsonRequirements
      */
     public function setDailyTasks(Collection|Arrayable|iterable|null $ids = null): static
     {
-        if (!$ids instanceof Collection) {
+        if (! $ids instanceof Collection) {
             $ids = new Collection($ids);
         }
 
         $ids = $ids
-            ->map(fn(mixed $value): mixed => $value instanceof DailyTask ? $value->id : $value)
-            ->filter(fn(mixed $value): bool => is_string($value) && filled($value))
-            ->map(fn(string $value): string => trim($value))
+            ->map(fn (mixed $value): mixed => $value instanceof DailyTask ? $value->id : $value)
+            ->filter(fn (mixed $value): bool => is_string($value) && filled($value))
+            ->map(fn (string $value): string => trim($value))
             ->values();
 
         $this->dailyTasks = $ids;
@@ -98,14 +98,14 @@ class AchievementRequirements implements JsonRequirements
      */
     public function setChallenges(Collection|Arrayable|iterable|null $ids = null): static
     {
-        if (!$ids instanceof Collection) {
+        if (! $ids instanceof Collection) {
             $ids = new Collection($ids);
         }
 
         $ids = $ids
-            ->map(fn(mixed $value): mixed => $value instanceof Challenge ? $value->id : $value)
-            ->filter(fn(mixed $value): bool => is_string($value) && filled($value))
-            ->map(fn(string $value): string => trim($value))
+            ->map(fn (mixed $value): mixed => $value instanceof Challenge ? $value->id : $value)
+            ->filter(fn (mixed $value): bool => is_string($value) && filled($value))
+            ->map(fn (string $value): string => trim($value))
             ->values();
 
         $this->challenges = $ids;
@@ -119,7 +119,7 @@ class AchievementRequirements implements JsonRequirements
             $id = $id->id;
         }
 
-        if (filled($id) && !$this->dailyTasks->contains($id)) {
+        if (filled($id) && ! $this->dailyTasks->contains($id)) {
             $this->dailyTasks->push($id);
         }
 
@@ -132,7 +132,7 @@ class AchievementRequirements implements JsonRequirements
             $id = $id->id;
         }
 
-        if (filled($id) && !$this->challenges->contains($id)) {
+        if (filled($id) && ! $this->challenges->contains($id)) {
             $this->challenges->push($id);
         }
 
@@ -146,7 +146,7 @@ class AchievementRequirements implements JsonRequirements
         }
 
         $this->dailyTasks = $this->dailyTasks
-            ->reject(static fn(string $value): bool => $value === $id)
+            ->reject(static fn (string $value): bool => $value === $id)
             ->values();
 
         return $this;
@@ -159,7 +159,7 @@ class AchievementRequirements implements JsonRequirements
         }
 
         $this->challenges = $this->challenges
-            ->reject(static fn(string $value): bool => $value === $id)
+            ->reject(static fn (string $value): bool => $value === $id)
             ->values();
 
         return $this;
@@ -167,14 +167,14 @@ class AchievementRequirements implements JsonRequirements
 
     public function flushDailyTasks(): static
     {
-        $this->dailyTasks = new Collection();
+        $this->dailyTasks = new Collection;
 
         return $this;
     }
 
     public function flushChallenges(): static
     {
-        $this->challenges = new Collection();
+        $this->challenges = new Collection;
 
         return $this;
     }
@@ -190,22 +190,22 @@ class AchievementRequirements implements JsonRequirements
 
     public function isEmpty(): bool
     {
-        return !$this->subscription
+        return ! $this->subscription
             && $this->dailyTasks->isEmpty()
             && $this->challenges->isEmpty();
     }
 
     public function isNotEmpty(): bool
     {
-        return !$this->isEmpty();
+        return ! $this->isEmpty();
     }
 
     public static function fromArray(array $data): static
     {
         return new static(
-            subscription: (bool) $data['subscription'] ?? false,
-            dailyTasks: $data['daily_tasks'] ?? [],
-            challenges: $data['challenges'] ?? [],
+            subscription: (bool) ($data['subscription'] ?? false),
+            dailyTasks: is_iterable($data['daily_tasks'] ?? null) ? $data['daily_tasks'] : [],
+            challenges: is_iterable($data['challenges'] ?? null) ? $data['challenges'] : [],
         );
     }
 

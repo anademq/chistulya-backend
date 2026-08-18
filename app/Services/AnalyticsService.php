@@ -8,30 +8,30 @@ use App\Models\ChallengeAnalytic;
 use App\Models\DailyTaskAnalytic;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsService
 {
-    private const CACHE_TTL_MINUTES = 10;
-
     // ─── Write: daily tasks ──────────────────────────────────────────────────
 
     public function incrementDailyTaskSelected(User $child, int $categoryId, Carbon $date): void
     {
-        $this->atomicIncrement('daily_task_analytics', [
+        $this->atomicIncrement(DailyTaskAnalytic::class, [
             'child_id' => $child->id,
             'category_id' => $categoryId,
-            'date' => $date->toDateString(),
+            'date' => $this->analyticsDate($child, $date),
         ], 'selected_count');
     }
 
     public function incrementDailyTaskCompleted(User $child, int $categoryId, Carbon $date): void
     {
-        $this->atomicIncrement('daily_task_analytics', [
+        $this->atomicIncrement(DailyTaskAnalytic::class, [
             'child_id' => $child->id,
             'category_id' => $categoryId,
-            'date' => $date->toDateString(),
+            'date' => $this->analyticsDate($child, $date),
         ], 'completed_count');
     }
 
@@ -39,172 +39,221 @@ class AnalyticsService
 
     public function incrementChallengeSelected(User $child, int $categoryId, Carbon $date): void
     {
-        $this->atomicIncrement('challenge_analytics', [
+        $this->atomicIncrement(ChallengeAnalytic::class, [
             'child_id' => $child->id,
             'category_id' => $categoryId,
-            'date' => $date->toDateString(),
+            'date' => $this->analyticsDate($child, $date),
         ], 'selected_count');
     }
 
     public function incrementChallengeCompleted(User $child, int $categoryId, Carbon $date): void
     {
-        $this->atomicIncrement('challenge_analytics', [
+        $this->atomicIncrement(ChallengeAnalytic::class, [
             'child_id' => $child->id,
             'category_id' => $categoryId,
-            'date' => $date->toDateString(),
+            'date' => $this->analyticsDate($child, $date),
         ], 'completed_count');
     }
 
     public function incrementChallengeFailed(User $child, int $categoryId, Carbon $date): void
     {
-        $this->atomicIncrement('challenge_analytics', [
+        $this->atomicIncrement(ChallengeAnalytic::class, [
             'child_id' => $child->id,
             'category_id' => $categoryId,
-            'date' => $date->toDateString(),
+            'date' => $this->analyticsDate($child, $date),
         ], 'failed_count');
     }
 
     // ─── Read: daily tasks ───────────────────────────────────────────────────
 
     /**
-     * Daily task analytics for the last N days, optionally filtered by category slug.
+     * Daily task analytics for the last N days, optionally filtered by category id.
      *
      * Returns a dense series (every day included, zero-filled if no data).
      *
      * @return array<int, array{date:string,weekday:int,selected_count:int,completed_count:int}>
      */
-    public function dailyTasksByLastDays(User $child, int $days = 30, ?string $categorySlug = null): array
+    public function dailyTasksByLastDays(User $child, int $days = 30, ?int $categoryId = null): array
     {
         $days = max(1, min(90, $days));
-        $start = now()->startOfDay()->subDays($days - 1);
-        $end = now()->endOfDay();
+        $now = $this->nowForChild($child);
+        $start = $now->copy()->startOfDay()->subDays($days - 1);
+        $end = $now->copy()->startOfDay();
 
-        $categoryId = $this->resolveTaskCategoryId($categorySlug);
+        $dateKey = $this->dateKeyExpression('date');
 
-        if ($categorySlug !== null && $categoryId === null) {
-            return $this->emptyDaySeries($start, $days);
+        $query = DailyTaskAnalytic::query()
+            ->where('child_id', $child->id)
+            ->whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
+            ->selectRaw("{$dateKey} as date_key, SUM(selected_count) as selected_count, SUM(completed_count) as completed_count")
+            ->groupByRaw($dateKey);
+
+        if ($categoryId !== null) {
+            $query->where('category_id', $categoryId);
         }
 
-        $cacheKey = sprintf('analytics:tasks:%s:%d:%s', $child->id, $days, $categoryId ?? 'all');
+        $raw = $query->get()->keyBy(static fn ($row): string => (string) $row->date_key);
 
-        return Cache::remember($cacheKey, now()->addMinutes(self::CACHE_TTL_MINUTES), function () use ($child, $start, $end, $categoryId, $days): array {
-            $query = DailyTaskAnalytic::query()
-                ->where('child_id', $child->id)
-                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-                ->selectRaw('date, SUM(selected_count) as selected_count, SUM(completed_count) as completed_count')
-                ->groupBy('date');
+        $result = [];
 
-            if ($categoryId !== null) {
-                $query->where('category_id', $categoryId);
-            }
+        for ($i = 0; $i < $days; $i++) {
+            $date = $start->copy()->addDays($i);
+            $key = $date->toDateString();
+            $row = $raw[$key] ?? null;
 
-            $raw = $query->get()->keyBy(fn ($row): string => Carbon::parse($row->date)->toDateString());
+            $result[] = [
+                'date' => $key,
+                'weekday' => (int) $date->dayOfWeekIso,
+                'selected_count' => (int) ($row?->selected_count ?? 0),
+                'completed_count' => (int) ($row?->completed_count ?? 0),
+            ];
+        }
 
-            $result = [];
-
-            for ($i = 0; $i < $days; $i++) {
-                $date = $start->copy()->addDays($i);
-                $key = $date->toDateString();
-                $row = $raw[$key] ?? null;
-
-                $result[] = [
-                    'date' => $key,
-                    'weekday' => (int) $date->dayOfWeekIso,
-                    'selected_count' => (int) ($row?->selected_count ?? 0),
-                    'completed_count' => (int) ($row?->completed_count ?? 0),
-                ];
-            }
-
-            return $result;
-        });
+        return $result;
     }
 
     // ─── Read: challenges ────────────────────────────────────────────────────
 
     /**
-     * Challenge analytics grouped by month for the last N months, optionally filtered by category slug.
+     * Challenge analytics grouped by month for the last N months, optionally filtered by category id.
      *
      * Returns a dense series (every month included, zero-filled if no data).
      *
      * @return array<int, array{month:string,selected_count:int,completed_count:int,failed_count:int}>
      */
-    public function challengesByLastMonths(User $child, int $months = 6, ?string $categorySlug = null): array
+    public function challengesByLastMonths(User $child, int $months = 6, ?int $categoryId = null): array
     {
         $months = max(1, min(12, $months));
-        $from = now()->startOfMonth()->subMonths($months - 1);
+        $from = $this->nowForChild($child)->startOfMonth()->subMonths($months - 1);
 
-        $categoryId = $this->resolveChallengesCategoryId($categorySlug);
+        $monthKey = $this->monthFormat('date');
 
-        if ($categorySlug !== null && $categoryId === null) {
-            return $this->emptyMonthSeries($from, $months);
+        $query = ChallengeAnalytic::query()
+            ->where('child_id', $child->id)
+            ->whereDate('date', '>=', $from->toDateString())
+            ->selectRaw("{$monthKey} as month_key, SUM(selected_count) as selected_count, SUM(completed_count) as completed_count, SUM(failed_count) as failed_count")
+            ->groupByRaw($monthKey);
+
+        if ($categoryId !== null) {
+            $query->where('category_id', $categoryId);
         }
 
-        $cacheKey = sprintf('analytics:challenges:%s:%d:%s', $child->id, $months, $categoryId ?? 'all');
+        $rows = $query->get()->keyBy(static fn ($row): string => (string) $row->month_key);
 
-        return Cache::remember($cacheKey, now()->addMinutes(self::CACHE_TTL_MINUTES), function () use ($child, $from, $months, $categoryId): array {
-            $query = ChallengeAnalytic::query()
-                ->where('child_id', $child->id)
-                ->where('date', '>=', $from->toDateString())
-                ->selectRaw($this->monthFormat('date') . " as month, SUM(selected_count) as selected_count, SUM(completed_count) as completed_count, SUM(failed_count) as failed_count")
-                ->groupByRaw($this->monthFormat('date'));
+        $result = [];
 
-            if ($categoryId !== null) {
-                $query->where('category_id', $categoryId);
-            }
+        for ($i = 0; $i < $months; $i++) {
+            $month = $from->copy()->addMonths($i)->format('Y-m');
+            $row = $rows[$month] ?? null;
 
-            $rows = $query->get()->keyBy('month');
+            $result[] = [
+                'month' => $month,
+                'selected_count' => (int) ($row?->selected_count ?? 0),
+                'completed_count' => (int) ($row?->completed_count ?? 0),
+                'failed_count' => (int) ($row?->failed_count ?? 0),
+            ];
+        }
 
-            $result = [];
-
-            for ($i = 0; $i < $months; $i++) {
-                $month = $from->copy()->addMonths($i)->format('Y-m');
-                $row = $rows[$month] ?? null;
-
-                $result[] = [
-                    'month' => $month,
-                    'selected_count' => (int) ($row?->selected_count ?? 0),
-                    'completed_count' => (int) ($row?->completed_count ?? 0),
-                    'failed_count' => (int) ($row?->failed_count ?? 0),
-                ];
-            }
-
-            return $result;
-        });
+        return $result;
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
 
     /**
-     * Atomically increment a counter column, inserting the row if it doesn't exist.
-     * Branches on DB driver so the same code runs on MySQL, PostgreSQL, and SQLite.
-     *
-     * @param  array<string, mixed>  $where  Values for the unique key columns
+     * @param  class-string<Model>  $modelClass
+     * @param  array{child_id:string,category_id:int,date:string}  $where
      */
-    private function atomicIncrement(string $table, array $where, string $column): void
+    private function atomicIncrement(string $modelClass, array $where, string $column): void
     {
-        $cols = array_merge(array_keys($where), [$column, 'created_at', 'updated_at']);
-        $placeholders = implode(', ', array_fill(0, count($where) + 1, '?')) . ', NOW(), NOW()';
-        $values = [...array_values($where), 1];
+        DB::transaction(function () use ($modelClass, $where, $column): void {
+            /** @var DailyTaskAnalytic|ChallengeAnalytic|null $record */
+            $record = $this->queryByUniqueKey($modelClass, $where)
+                ->lockForUpdate()
+                ->first();
 
-        if (DB::getDriverName() === 'mysql') {
-            $q = fn (string $c): string => '`' . $c . '`';
-            $colList = implode(', ', array_map($q, $cols));
-            DB::statement(
-                "INSERT INTO {$q($table)} ({$colList}) VALUES ({$placeholders}) " .
-                "ON DUPLICATE KEY UPDATE {$q($column)} = {$q($column)} + 1, `updated_at` = NOW()",
-                $values,
-            );
-        } else {
-            // PostgreSQL and SQLite both support the SQL-standard upsert syntax.
-            $q = fn (string $c): string => '"' . $c . '"';
-            $colList = implode(', ', array_map($q, $cols));
-            $conflictCols = implode(', ', array_map($q, array_keys($where)));
-            DB::statement(
-                "INSERT INTO {$q($table)} ({$colList}) VALUES ({$placeholders}) " .
-                "ON CONFLICT ({$conflictCols}) DO UPDATE SET {$q($column)} = {$q($column)} + 1, \"updated_at\" = NOW()",
-                $values,
-            );
+            if ($record !== null) {
+                $record->increment($column);
+
+                return;
+            }
+
+            $payload = [
+                ...$where,
+                ...$this->zeroCounters($modelClass),
+                $column => 1,
+            ];
+
+            try {
+                $modelClass::query()->create($payload);
+            } catch (QueryException $exception) {
+                if (! $this->isUniqueViolation($exception)) {
+                    throw $exception;
+                }
+
+                $this->queryByUniqueKey($modelClass, $where)
+                    ->lockForUpdate()
+                    ->first()
+                    ?->increment($column);
+            }
+        });
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array{child_id:string,category_id:int,date:string}  $where
+     * @return Builder<Model>
+     */
+    private function queryByUniqueKey(string $modelClass, array $where): Builder
+    {
+        return $modelClass::query()
+            ->where('child_id', $where['child_id'])
+            ->where('category_id', $where['category_id'])
+            ->whereDate('date', $where['date']);
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @return array<string, int>
+     */
+    private function zeroCounters(string $modelClass): array
+    {
+        return match ($modelClass) {
+            DailyTaskAnalytic::class => [
+                'selected_count' => 0,
+                'completed_count' => 0,
+            ],
+            ChallengeAnalytic::class => [
+                'selected_count' => 0,
+                'completed_count' => 0,
+                'failed_count' => 0,
+            ],
+            default => throw new \InvalidArgumentException("Unknown analytics model: {$modelClass}"),
+        };
+    }
+
+    private function isUniqueViolation(QueryException $exception): bool
+    {
+        $code = (string) $exception->getCode();
+
+        if (in_array($code, ['23000', '23505'], true)) {
+            return true;
         }
+
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'unique constraint')
+            || str_contains($message, 'duplicate key')
+            || str_contains($message, 'unique violation');
+    }
+
+    private function dateKeyExpression(string $column): string
+    {
+        return match (DB::getDriverName()) {
+            'pgsql' => "{$column}::text",
+            'sqlite' => "date({$column})",
+            default => "DATE({$column})",
+        };
     }
 
     private function monthFormat(string $column): string
@@ -216,69 +265,20 @@ class AnalyticsService
         };
     }
 
-    private function resolveTaskCategoryId(?string $slug): ?int
+    private function childTimezone(User $child): string
     {
-        if ($slug === null) {
-            return null;
-        }
-
-        return (int) Cache::remember(
-            "analytics:category:task:{$slug}",
-            now()->addHour(),
-            fn (): mixed => DB::table('daily_task_categories')->where('slug', $slug)->value('id'),
-        ) ?: null;
+        return (string) (DB::table('profiles')
+            ->where('user_id', $child->id)
+            ->value('timezone') ?? config('app.timezone', 'UTC'));
     }
 
-    private function resolveChallengesCategoryId(?string $slug): ?int
+    private function nowForChild(User $child): Carbon
     {
-        if ($slug === null) {
-            return null;
-        }
-
-        return (int) Cache::remember(
-            "analytics:category:challenge:{$slug}",
-            now()->addHour(),
-            fn (): mixed => DB::table('challenge_categories')->where('slug', $slug)->value('id'),
-        ) ?: null;
+        return now()->setTimezone($this->childTimezone($child));
     }
 
-    /**
-     * @return array<int, array{date:string,weekday:int,selected_count:int,completed_count:int}>
-     */
-    private function emptyDaySeries(Carbon $start, int $days): array
+    private function analyticsDate(User $child, Carbon $moment): string
     {
-        $result = [];
-
-        for ($i = 0; $i < $days; $i++) {
-            $date = $start->copy()->addDays($i);
-
-            $result[] = [
-                'date' => $date->toDateString(),
-                'weekday' => (int) $date->dayOfWeekIso,
-                'selected_count' => 0,
-                'completed_count' => 0,
-            ];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array<int, array{month:string,selected_count:int,completed_count:int,failed_count:int}>
-     */
-    private function emptyMonthSeries(Carbon $from, int $months): array
-    {
-        $result = [];
-
-        for ($i = 0; $i < $months; $i++) {
-            $result[] = [
-                'month' => $from->copy()->addMonths($i)->format('Y-m'),
-                'selected_count' => 0,
-                'completed_count' => 0,
-                'failed_count' => 0,
-            ];
-        }
-
-        return $result;
+        return $moment->copy()->setTimezone($this->childTimezone($child))->toDateString();
     }
 }

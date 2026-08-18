@@ -19,7 +19,7 @@ class PetItemRequirements implements JsonRequirements
 
     public function isSubscriptionRequired(): bool
     {
-        return (bool) $this->subscription ?? false;
+        return $this->subscription;
     }
 
     public function setSubscriptionRequirement(bool $value = false): static
@@ -38,18 +38,18 @@ class PetItemRequirements implements JsonRequirements
 
     public function isEmpty(): bool
     {
-        return !$this->subscription;
+        return ! $this->subscription;
     }
 
     public function isNotEmpty(): bool
     {
-        return !$this->isEmpty();
+        return ! $this->isEmpty();
     }
 
     public static function fromArray(array $data): static
     {
         return new static(
-            subscription: (bool) $data['subscription'] ?? false,
+            subscription: (bool) ($data['subscription'] ?? false),
         );
     }
 

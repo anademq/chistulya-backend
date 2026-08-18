@@ -1,17 +1,31 @@
 #!/bin/bash
-set -e
+# Container entrypoint for every PHP role in the stack.
+#
+# APP_ROLE decides what happens before the given command is exec'd:
+#   app       → wait for postgres, migrate, provision storage, warm caches, serve
+#   worker    → wait for postgres, then run (queue / scheduler)
+#   reverb    → run immediately; Reverb needs neither the database nor caches
+#
+# Everything that touches the filesystem or the database runs as www-data, so no
+# root-owned file is ever left in storage/ or bootstrap/cache/.
+set -euo pipefail
 
 APP_DIR=/var/www/html
 STORAGE_DIR="$APP_DIR/storage"
 CACHE_DIR="$APP_DIR/bootstrap/cache"
-
-# APP_ROLE controls what this container does at startup:
-#   app    → wait for DB, run migrations, warm caches, then start php-fpm
-#   worker → wait for DB, then exec the given command (queue, scheduler)
-#   reverb → skip DB wait, exec the given command immediately
 APP_ROLE="${APP_ROLE:-app}"
+DB_WAIT_TIMEOUT="${DB_WAIT_TIMEOUT:-60}"
+
+log() {
+    printf '[entrypoint][%s] %s\n' "$APP_ROLE" "$1" >&2
+}
+
+as_app() {
+    su-exec www-data "$@"
+}
 
 main() {
+    require_env
     prepare_dirs
 
     if [ "$APP_ROLE" != "reverb" ]; then
@@ -20,10 +34,41 @@ main() {
 
     if [ "$APP_ROLE" = "app" ]; then
         run_migrations
+        provision_storage
+    fi
+
+    # Every role caches config: a worker that reads .env on each job is both
+    # slower and liable to disagree with the web container.
+    if [ "$APP_ROLE" != "reverb" ]; then
         warm_caches
     fi
 
+    log "Starting: $*"
     exec "$@"
+}
+
+# Fail fast and loudly on a missing secret, rather than booting a container that
+# silently connects nowhere.
+require_env() {
+    local required=(APP_KEY)
+    local missing=()
+
+    # Reverb neither migrates nor queries, so it must not be blocked on database
+    # credentials it will never use.
+    if [ "$APP_ROLE" != "reverb" ]; then
+        required+=(DB_HOST DB_DATABASE DB_USERNAME DB_PASSWORD)
+    fi
+
+    for var in "${required[@]}"; do
+        if [ -z "${!var:-}" ]; then
+            missing+=("$var")
+        fi
+    done
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        log "FATAL: missing required environment: ${missing[*]}"
+        exit 1
+    fi
 }
 
 prepare_dirs() {
@@ -32,35 +77,60 @@ prepare_dirs() {
         "$STORAGE_DIR/framework/cache/data" \
         "$STORAGE_DIR/framework/sessions" \
         "$STORAGE_DIR/framework/views" \
+        "$STORAGE_DIR/logs" \
         "$CACHE_DIR"
 
+    # The storage volume is mounted at runtime and comes up root-owned.
     chown -R www-data:www-data "$STORAGE_DIR" "$CACHE_DIR"
     chmod -R 775 "$STORAGE_DIR" "$CACHE_DIR"
-
-    if [ ! -L "$APP_DIR/public/storage" ]; then
-        php artisan storage:link --force
-    fi
 }
 
 wait_for_db() {
-    echo "[entrypoint] Waiting for PostgreSQL at $DB_HOST:${DB_PORT:-5432}…"
+    local waited=0
+
+    log "Waiting for PostgreSQL at $DB_HOST:${DB_PORT:-5432} (timeout ${DB_WAIT_TIMEOUT}s)…"
+
     until pg_isready -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USERNAME" -d "$DB_DATABASE" -q; do
+        waited=$((waited + 1))
+
+        if [ "$waited" -ge "$DB_WAIT_TIMEOUT" ]; then
+            log "FATAL: PostgreSQL did not become ready within ${DB_WAIT_TIMEOUT}s."
+            exit 1
+        fi
+
         sleep 1
     done
-    echo "[entrypoint] PostgreSQL is ready."
+
+    log "PostgreSQL is ready."
 }
 
+# --isolated takes an advisory lock, so concurrent app containers cannot run the
+# same migration twice. Harmless with a single container, correct with more.
 run_migrations() {
-    echo "[entrypoint] Running migrations…"
-    php artisan migrate --force
+    log "Running migrations…"
+    as_app php artisan migrate --force --isolated --no-interaction
+}
+
+# Replaces the old minio-init service: creates the bucket, blocks public access
+# and installs the tmp/ expiry rule. Idempotent, so it is safe on every boot.
+provision_storage() {
+    log "Provisioning object storage…"
+    as_app php artisan storage:provision --no-interaction
 }
 
 warm_caches() {
-    echo "[entrypoint] Warming caches…"
-    php artisan config:cache
-    php artisan route:cache
-    php artisan event:cache
-    php artisan view:cache
+    log "Warming caches…"
+    as_app php artisan config:cache
+    as_app php artisan event:cache
+
+    # Mail notifications are rendered from Blade in the queue worker too, so
+    # views are compiled for every role that boots the framework.
+    as_app php artisan view:cache
+
+    # Routes only matter to the container that serves HTTP.
+    if [ "$APP_ROLE" = "app" ]; then
+        as_app php artisan route:cache
+    fi
 }
 
 main "$@"

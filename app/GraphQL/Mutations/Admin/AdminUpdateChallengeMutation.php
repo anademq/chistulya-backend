@@ -29,7 +29,7 @@ class AdminUpdateChallengeMutation extends AdminMutation
         return [
             'id' => ['type' => Type::nonNull(Type::string())],
             'scope' => ['type' => Type::string()],
-            'category_id' => ['type' => Type::string()],
+            'category_id' => ['type' => Type::int()],
             'title' => ['type' => Type::string()],
             'short_description' => ['type' => Type::string()],
             'description' => ['type' => Type::string()],
@@ -68,14 +68,14 @@ class AdminUpdateChallengeMutation extends AdminMutation
 
             $fields = array_filter(
                 array_intersect_key($args, array_flip(['scope', 'category_id', 'title', 'short_description', 'description', 'reward_xp', 'reward_coins', 'duration_days'])),
-                static fn($v) => $v !== null,
+                static fn ($v) => $v !== null,
             );
 
-            if (!empty($fields)) {
+            if (! empty($fields)) {
                 $challenge->forceFill($fields)->save();
             }
 
-            if (!empty($args['media_id'])) {
+            if (! empty($args['media_id'])) {
                 $media = Media::whereKey($args['media_id'])->firstOrFail();
                 app(MediaService::class)->attachToEntity($media, $challenge);
             }

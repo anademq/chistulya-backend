@@ -1,11 +1,214 @@
 <?php
 
 declare(strict_types=1);
+use App\GraphQL\Mutations\Account\ConfirmMediaUploadMutation;
+use App\GraphQL\Mutations\Account\LoginMutation;
+use App\GraphQL\Mutations\Account\LogoutMutation;
+use App\GraphQL\Mutations\Account\RefreshTokenMutation;
+use App\GraphQL\Mutations\Account\RegisterMutation;
+use App\GraphQL\Mutations\Account\RequestEmailVerificationMutation;
+use App\GraphQL\Mutations\Account\RequestMediaUploadMutation;
+use App\GraphQL\Mutations\Account\RequestPasswordResetMutation;
+use App\GraphQL\Mutations\Account\ResetPasswordMutation;
+use App\GraphQL\Mutations\Account\UpdatePasswordMutation;
+use App\GraphQL\Mutations\Account\UpsertProfileMutation;
+use App\GraphQL\Mutations\Account\VerifyEmailMutation;
+use App\GraphQL\Mutations\Admin\AdminAdjustCoinsMutation;
+use App\GraphQL\Mutations\Admin\AdminAdjustExpMutation;
+use App\GraphQL\Mutations\Admin\AdminClearPetItemsMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateAchievementMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateChallengeMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateDailyRewardMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateDailyTaskMutation;
+use App\GraphQL\Mutations\Admin\AdminCreatePetItemMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateReminderMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateSubscriptionMutation;
+use App\GraphQL\Mutations\Admin\AdminCreateUserMutation;
+use App\GraphQL\Mutations\Admin\AdminDeleteAchievementMutation;
+use App\GraphQL\Mutations\Admin\AdminDeleteChallengeMutation;
+use App\GraphQL\Mutations\Admin\AdminDeleteDailyTaskMutation;
+use App\GraphQL\Mutations\Admin\AdminDeletePetItemMutation;
+use App\GraphQL\Mutations\Admin\AdminDeleteReminderMutation;
+use App\GraphQL\Mutations\Admin\AdminDeleteSubscriptionMutation;
+use App\GraphQL\Mutations\Admin\AdminDeleteUserMutation;
+use App\GraphQL\Mutations\Admin\AdminForceLogoutMutation;
+use App\GraphQL\Mutations\Admin\AdminGrantPetItemToChildMutation;
+use App\GraphQL\Mutations\Admin\AdminGrantSubscriptionMutation;
+use App\GraphQL\Mutations\Admin\AdminLinkParentChildMutation;
+use App\GraphQL\Mutations\Admin\AdminRevokePetItemMutation;
+use App\GraphQL\Mutations\Admin\AdminRevokeSubscriptionMutation;
+use App\GraphQL\Mutations\Admin\AdminSetChildCoinsMutation;
+use App\GraphQL\Mutations\Admin\AdminSetChildExpMutation;
+use App\GraphQL\Mutations\Admin\AdminUnlinkParentChildMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateAchievementMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateChallengeMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateDailyRewardMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateDailyTaskMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdatePetItemMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateReminderMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateSubscriptionMutation;
+use App\GraphQL\Mutations\Admin\AdminUpdateUserMutation;
+use App\GraphQL\Mutations\Admin\AdminUpsertUserProfileMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminCreateChallengeCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminCreateDailyTaskCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminCreatePetItemCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminDeleteChallengeCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminDeleteDailyTaskCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminDeletePetItemCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminUpdateChallengeCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminUpdateDailyTaskCategoryMutation;
+use App\GraphQL\Mutations\Admin\Category\AdminUpdatePetItemCategoryMutation;
+use App\GraphQL\Mutations\Child\ActivateReminderMutation;
+use App\GraphQL\Mutations\Child\ClaimAchievementRewardMutation;
+use App\GraphQL\Mutations\Child\ClaimChallengeRewardMutation;
+use App\GraphQL\Mutations\Child\ClaimDailyRewardMutation;
+use App\GraphQL\Mutations\Child\ClaimDailyTaskRewardMutation;
+use App\GraphQL\Mutations\Child\CompleteDailyTaskMutation;
+use App\GraphQL\Mutations\Child\CompleteReminderMutation;
+use App\GraphQL\Mutations\Child\CreateChildLinkTokenMutation;
+use App\GraphQL\Mutations\Child\DeleteReminderMutation;
+use App\GraphQL\Mutations\Child\EquipPetItemMutation;
+use App\GraphQL\Mutations\Child\MarkNotificationsAsReadMutation;
+use App\GraphQL\Mutations\Child\ProgressChallengeMutation;
+use App\GraphQL\Mutations\Child\PurchasePetItemMutation;
+use App\GraphQL\Mutations\Child\SelectChallengeMutation;
+use App\GraphQL\Mutations\Child\SelectDailyTaskMutation;
+use App\GraphQL\Mutations\Child\StartChallengeMutation;
+use App\GraphQL\Mutations\Child\UnequipPetItemMutation;
+use App\GraphQL\Mutations\Child\UnselectDailyTaskMutation;
+use App\GraphQL\Mutations\Child\UpdateReminderMutation;
+use App\GraphQL\Mutations\CreateReminderMutation;
+use App\GraphQL\Mutations\Parent\CancelSubscriptionMutation;
+use App\GraphQL\Mutations\Parent\ConfirmSubscriptionPaymentMutation;
+use App\GraphQL\Mutations\Parent\CreateCustomDailyTaskForChildMutation;
+use App\GraphQL\Mutations\Parent\CreateCustomReminderForChildMutation;
+use App\GraphQL\Mutations\Parent\CreateSubscriptionPaymentMutation;
+use App\GraphQL\Mutations\Parent\DeleteCustomDailyTaskForChildMutation;
+use App\GraphQL\Mutations\Parent\LinkChildByTokenMutation;
+use App\GraphQL\Mutations\Parent\RenewSubscriptionMutation;
+use App\GraphQL\Mutations\Parent\SubscribeMutation;
+use App\GraphQL\Mutations\Parent\UnlinkChildMutation;
+use App\GraphQL\Mutations\Parent\UpdateCustomDailyTaskForChildMutation;
+use App\GraphQL\Queries\Account\MeQuery;
+use App\GraphQL\Queries\Account\MyActiveSubscriptionQuery;
+use App\GraphQL\Queries\Account\MySessionsQuery;
+use App\GraphQL\Queries\Admin\AdminAchievementsQuery;
+use App\GraphQL\Queries\Admin\AdminChallengeAnalyticsQuery;
+use App\GraphQL\Queries\Admin\AdminChallengesQuery;
+use App\GraphQL\Queries\Admin\AdminDailyRewardsQuery;
+use App\GraphQL\Queries\Admin\AdminDailyTaskAnalyticsQuery;
+use App\GraphQL\Queries\Admin\AdminDailyTasksQuery;
+use App\GraphQL\Queries\Admin\AdminPetItemsQuery;
+use App\GraphQL\Queries\Admin\AdminRemindersQuery;
+use App\GraphQL\Queries\Admin\AdminSubscriptionsQuery;
+use App\GraphQL\Queries\Admin\AdminUserQuery;
+use App\GraphQL\Queries\Admin\AdminUsersQuery;
+use App\GraphQL\Queries\AvailableChallengesQuery;
+use App\GraphQL\Queries\AvailableDailyTasksQuery;
+use App\GraphQL\Queries\ChallengeAnalyticsQuery;
+use App\GraphQL\Queries\ChallengeCategoriesQuery;
+use App\GraphQL\Queries\Child\MyChildCabinetQuery;
+use App\GraphQL\Queries\Child\MyParentsQuery;
+use App\GraphQL\Queries\Child\NotificationsQuery;
+use App\GraphQL\Queries\DailyTaskAnalyticsQuery;
+use App\GraphQL\Queries\DailyTaskCategoriesQuery;
+use App\GraphQL\Queries\MyAchievementsQuery;
+use App\GraphQL\Queries\MyPetItemsQuery;
+use App\GraphQL\Queries\MyRemindersQuery;
+use App\GraphQL\Queries\Parent\ChildProgressSummaryQuery;
+use App\GraphQL\Queries\Parent\MyChildrenQuery;
+use App\GraphQL\Queries\Parent\MyPaymentsQuery;
+use App\GraphQL\Queries\Parent\SubscriptionsQuery;
+use App\GraphQL\Queries\PetCatalogQuery;
+use App\GraphQL\Queries\PetItemCategoriesQuery;
+use App\GraphQL\Queries\SelectedChallengesQuery;
+use App\GraphQL\Queries\SelectedDailyTasksQuery;
+use App\GraphQL\Support\ErrorFormatter;
+use App\GraphQL\Types\AccessTokenType;
+use App\GraphQL\Types\AchievementRequirementsInput;
+use App\GraphQL\Types\AchievementRequirementsType;
+use App\GraphQL\Types\AchievementType;
+use App\GraphQL\Types\AuthTokensType;
+use App\GraphQL\Types\ChallengeAnalyticsPointType;
+use App\GraphQL\Types\ChallengeCategoryType;
+use App\GraphQL\Types\ChallengeType;
+use App\GraphQL\Types\ChildAchievementType;
+use App\GraphQL\Types\ChildCabinetType;
+use App\GraphQL\Types\ChildChallengeType;
+use App\GraphQL\Types\ChildDailyTaskType;
+use App\GraphQL\Types\ChildLinkTokenType;
+use App\GraphQL\Types\ChildPetItemType;
+use App\GraphQL\Types\ChildProgressSummaryType;
+use App\GraphQL\Types\ChildReminderType;
+use App\GraphQL\Types\DailyRewardType;
+use App\GraphQL\Types\DailyTaskAnalyticsPointType;
+use App\GraphQL\Types\DailyTaskCategoryType;
+use App\GraphQL\Types\DailyTaskType;
+use App\GraphQL\Types\Errors\InvalidActionErrorType;
+use App\GraphQL\Types\Errors\MutationErrorUnionType;
+use App\GraphQL\Types\Errors\RateLimitErrorType;
+use App\GraphQL\Types\Errors\ValidationErrorType;
+use App\GraphQL\Types\Errors\ValidationFieldType;
+use App\GraphQL\Types\ExpType;
+use App\GraphQL\Types\FamilyLinkType;
+use App\GraphQL\Types\MediaType;
+use App\GraphQL\Types\MutationStatusType;
+use App\GraphQL\Types\Payloads\AchievementPayloadType;
+use App\GraphQL\Types\Payloads\AuthPayloadType;
+use App\GraphQL\Types\Payloads\ChallengeCategoryPayloadType;
+use App\GraphQL\Types\Payloads\ChallengePayloadType;
+use App\GraphQL\Types\Payloads\ChildChallengePayloadType;
+use App\GraphQL\Types\Payloads\ChildDailyTaskPayloadType;
+use App\GraphQL\Types\Payloads\ChildPetItemPayloadType;
+use App\GraphQL\Types\Payloads\ClaimAchievementRewardPayloadType;
+use App\GraphQL\Types\Payloads\ClaimChallengeRewardPayloadType;
+use App\GraphQL\Types\Payloads\ClaimDailyRewardPayloadType;
+use App\GraphQL\Types\Payloads\ClaimDailyTaskRewardPayloadType;
+use App\GraphQL\Types\Payloads\ConfirmMediaUploadPayloadType;
+use App\GraphQL\Types\Payloads\CreateChildLinkTokenPayloadType;
+use App\GraphQL\Types\Payloads\DailyRewardPayloadType;
+use App\GraphQL\Types\Payloads\DailyTaskCategoryPayloadType;
+use App\GraphQL\Types\Payloads\DailyTaskPayloadType;
+use App\GraphQL\Types\Payloads\ExpPayloadType;
+use App\GraphQL\Types\Payloads\FamilyLinkPayloadType;
+use App\GraphQL\Types\Payloads\LinkChildByTokenPayloadType;
+use App\GraphQL\Types\Payloads\MutationPayloadType;
+use App\GraphQL\Types\Payloads\PaymentPayloadType;
+use App\GraphQL\Types\Payloads\PetItemCategoryPayloadType;
+use App\GraphQL\Types\Payloads\PetItemPayloadType;
+use App\GraphQL\Types\Payloads\PurchasePetItemPayloadType;
+use App\GraphQL\Types\Payloads\ReminderPayloadType;
+use App\GraphQL\Types\Payloads\RequestMediaUploadPayloadType;
+use App\GraphQL\Types\Payloads\SubscriptionPayloadType;
+use App\GraphQL\Types\Payloads\UpsertProfilePayloadType;
+use App\GraphQL\Types\Payloads\UserPayloadType;
+use App\GraphQL\Types\Payloads\WalletPayloadType;
+use App\GraphQL\Types\PaymentType;
+use App\GraphQL\Types\PetItemCategoryType;
+use App\GraphQL\Types\PetItemType;
+use App\GraphQL\Types\ProfileType;
+use App\GraphQL\Types\RefreshTokenType;
+use App\GraphQL\Types\ReminderType;
+use App\GraphQL\Types\RewardGrantType;
+use App\GraphQL\Types\SessionType;
+use App\GraphQL\Types\SubscriptionType;
+use App\GraphQL\Types\UserErrorType;
+use App\GraphQL\Types\UserSubscriptionType;
+use App\GraphQL\Types\UserType;
+use App\GraphQL\Types\WalletType;
+use Rebing\GraphQL\GraphQL;
+use Rebing\GraphQL\GraphQLController;
+use Rebing\GraphQL\Support\CursorPaginationType;
+use Rebing\GraphQL\Support\ExecutionMiddleware\AddAuthUserContextValueMiddleware;
+use Rebing\GraphQL\Support\ExecutionMiddleware\AutomaticPersistedQueriesMiddleware;
+use Rebing\GraphQL\Support\ExecutionMiddleware\ValidateOperationParamsMiddleware;
+use Rebing\GraphQL\Support\PaginationType;
+use Rebing\GraphQL\Support\SimplePaginationType;
 
 return [
     'route' => [
         'prefix' => 'graphql',
-        'controller' => Rebing\GraphQL\GraphQLController::class . '@query',
+        'controller' => GraphQLController::class.'@query',
         'middleware' => ['request.expects_json', 'throttle:graphql'],
         'group_attributes' => [],
     ],
@@ -20,96 +223,96 @@ return [
         'default' => [
             'query' => [
                 // Auth & user
-                App\GraphQL\Queries\Account\MeQuery::class,
-                App\GraphQL\Queries\Account\MySessionsQuery::class,
+                MeQuery::class,
+                MySessionsQuery::class,
                 // Notifications (child-only)
-                App\GraphQL\Queries\Child\NotificationsQuery::class,
+                NotificationsQuery::class,
                 // Categories (public lookup lists)
-                App\GraphQL\Queries\DailyTaskCategoriesQuery::class,
-                App\GraphQL\Queries\ChallengeCategoriesQuery::class,
-                App\GraphQL\Queries\PetItemCategoriesQuery::class,
+                DailyTaskCategoriesQuery::class,
+                ChallengeCategoriesQuery::class,
+                PetItemCategoriesQuery::class,
                 // Family
-                App\GraphQL\Queries\Parent\MyChildrenQuery::class,
-                App\GraphQL\Queries\Parent\ChildProgressSummaryQuery::class,
-                App\GraphQL\Queries\Child\MyParentsQuery::class,
-                App\GraphQL\Queries\Child\MyChildCabinetQuery::class,
+                MyChildrenQuery::class,
+                ChildProgressSummaryQuery::class,
+                MyParentsQuery::class,
+                MyChildCabinetQuery::class,
                 // Daily tasks (auth — usable by both child and parent with child_id)
-                App\GraphQL\Queries\AvailableDailyTasksQuery::class,
-                App\GraphQL\Queries\SelectedDailyTasksQuery::class,
+                AvailableDailyTasksQuery::class,
+                SelectedDailyTasksQuery::class,
                 // Challenges
-                App\GraphQL\Queries\AvailableChallengesQuery::class,
-                App\GraphQL\Queries\SelectedChallengesQuery::class,
+                AvailableChallengesQuery::class,
+                SelectedChallengesQuery::class,
                 // Achievements
-                App\GraphQL\Queries\MyAchievementsQuery::class,
+                MyAchievementsQuery::class,
                 // Reminders
-                App\GraphQL\Queries\MyRemindersQuery::class,
+                MyRemindersQuery::class,
                 // Pet shop
-                App\GraphQL\Queries\PetCatalogQuery::class,
-                App\GraphQL\Queries\MyPetItemsQuery::class,
+                PetCatalogQuery::class,
+                MyPetItemsQuery::class,
                 // Analytics
-                App\GraphQL\Queries\DailyTaskAnalyticsQuery::class,
-                App\GraphQL\Queries\ChallengeAnalyticsQuery::class,
+                DailyTaskAnalyticsQuery::class,
+                ChallengeAnalyticsQuery::class,
                 // Subscriptions & payments
-                App\GraphQL\Queries\Parent\SubscriptionsQuery::class,
-                App\GraphQL\Queries\Account\MyActiveSubscriptionQuery::class,
-                App\GraphQL\Queries\Parent\MyPaymentsQuery::class,
+                SubscriptionsQuery::class,
+                MyActiveSubscriptionQuery::class,
+                MyPaymentsQuery::class,
             ],
             'mutation' => [
                 // Auth (public — no JWT required)
-                App\GraphQL\Mutations\Account\RegisterMutation::class,
-                App\GraphQL\Mutations\Account\RequestEmailVerificationMutation::class,
-                App\GraphQL\Mutations\Account\VerifyEmailMutation::class,
-                App\GraphQL\Mutations\Account\LoginMutation::class,
-                App\GraphQL\Mutations\Account\RefreshTokenMutation::class,
-                App\GraphQL\Mutations\Account\RequestPasswordResetMutation::class,
-                App\GraphQL\Mutations\Account\ResetPasswordMutation::class,
+                RegisterMutation::class,
+                RequestEmailVerificationMutation::class,
+                VerifyEmailMutation::class,
+                LoginMutation::class,
+                RefreshTokenMutation::class,
+                RequestPasswordResetMutation::class,
+                ResetPasswordMutation::class,
                 // Auth (JWT required)
-                App\GraphQL\Mutations\Account\LogoutMutation::class,
-                App\GraphQL\Mutations\Account\UpsertProfileMutation::class,
-                App\GraphQL\Mutations\Account\UpdatePasswordMutation::class,
-                App\GraphQL\Mutations\Account\RequestMediaUploadMutation::class,
-                App\GraphQL\Mutations\Account\ConfirmMediaUploadMutation::class,
-                App\GraphQL\Mutations\CreateReminderMutation::class,
+                LogoutMutation::class,
+                UpsertProfileMutation::class,
+                UpdatePasswordMutation::class,
+                RequestMediaUploadMutation::class,
+                ConfirmMediaUploadMutation::class,
+                CreateReminderMutation::class,
                 // Notifications (child-only)
-                App\GraphQL\Mutations\Child\MarkNotificationsAsReadMutation::class,
+                MarkNotificationsAsReadMutation::class,
                 // Family linking
-                App\GraphQL\Mutations\Child\CreateChildLinkTokenMutation::class,
-                App\GraphQL\Mutations\Parent\LinkChildByTokenMutation::class,
-                App\GraphQL\Mutations\Parent\UnlinkChildMutation::class,
+                CreateChildLinkTokenMutation::class,
+                LinkChildByTokenMutation::class,
+                UnlinkChildMutation::class,
                 // Daily tasks
-                App\GraphQL\Mutations\Child\SelectDailyTaskMutation::class,
-                App\GraphQL\Mutations\Child\UnselectDailyTaskMutation::class,
-                App\GraphQL\Mutations\Child\CompleteDailyTaskMutation::class,
-                App\GraphQL\Mutations\Child\ClaimDailyTaskRewardMutation::class,
+                SelectDailyTaskMutation::class,
+                UnselectDailyTaskMutation::class,
+                CompleteDailyTaskMutation::class,
+                ClaimDailyTaskRewardMutation::class,
                 // Challenges
-                App\GraphQL\Mutations\Child\SelectChallengeMutation::class,
-                App\GraphQL\Mutations\Child\StartChallengeMutation::class,
-                App\GraphQL\Mutations\Child\ProgressChallengeMutation::class,
-                App\GraphQL\Mutations\Child\ClaimChallengeRewardMutation::class,
+                SelectChallengeMutation::class,
+                StartChallengeMutation::class,
+                ProgressChallengeMutation::class,
+                ClaimChallengeRewardMutation::class,
                 // Daily reward
-                App\GraphQL\Mutations\Child\ClaimDailyRewardMutation::class,
+                ClaimDailyRewardMutation::class,
                 // Achievements
-                App\GraphQL\Mutations\Child\ClaimAchievementRewardMutation::class,
+                ClaimAchievementRewardMutation::class,
                 // Reminders
-                App\GraphQL\Mutations\Child\CompleteReminderMutation::class,
-                App\GraphQL\Mutations\Child\ActivateReminderMutation::class,
-                App\GraphQL\Mutations\Child\UpdateReminderMutation::class,
-                App\GraphQL\Mutations\Child\DeleteReminderMutation::class,
+                CompleteReminderMutation::class,
+                ActivateReminderMutation::class,
+                UpdateReminderMutation::class,
+                DeleteReminderMutation::class,
                 // Parent custom content
-                App\GraphQL\Mutations\Parent\CreateCustomDailyTaskForChildMutation::class,
-                App\GraphQL\Mutations\Parent\UpdateCustomDailyTaskForChildMutation::class,
-                App\GraphQL\Mutations\Parent\DeleteCustomDailyTaskForChildMutation::class,
-                App\GraphQL\Mutations\Parent\CreateCustomReminderForChildMutation::class,
+                CreateCustomDailyTaskForChildMutation::class,
+                UpdateCustomDailyTaskForChildMutation::class,
+                DeleteCustomDailyTaskForChildMutation::class,
+                CreateCustomReminderForChildMutation::class,
                 // Pet shop
-                App\GraphQL\Mutations\Child\PurchasePetItemMutation::class,
-                App\GraphQL\Mutations\Child\EquipPetItemMutation::class,
-                App\GraphQL\Mutations\Child\UnequipPetItemMutation::class,
+                PurchasePetItemMutation::class,
+                EquipPetItemMutation::class,
+                UnequipPetItemMutation::class,
                 // Subscriptions
-                App\GraphQL\Mutations\Parent\SubscribeMutation::class,
-                App\GraphQL\Mutations\Parent\RenewSubscriptionMutation::class,
-                App\GraphQL\Mutations\Parent\CancelSubscriptionMutation::class,
-                App\GraphQL\Mutations\Parent\CreateSubscriptionPaymentMutation::class,
-                App\GraphQL\Mutations\Parent\ConfirmSubscriptionPaymentMutation::class,
+                SubscribeMutation::class,
+                RenewSubscriptionMutation::class,
+                CancelSubscriptionMutation::class,
+                CreateSubscriptionPaymentMutation::class,
+                ConfirmSubscriptionPaymentMutation::class,
             ],
             'types' => [],
             'middleware' => null,
@@ -121,66 +324,76 @@ return [
         'admin' => [
             'query' => [
                 // Users
-                App\GraphQL\Queries\Admin\AdminUsersQuery::class,
-                App\GraphQL\Queries\Admin\AdminUserQuery::class,
+                AdminUsersQuery::class,
+                AdminUserQuery::class,
                 // Content management
-                App\GraphQL\Queries\Admin\AdminSubscriptionsQuery::class,
-                App\GraphQL\Queries\Admin\AdminDailyTasksQuery::class,
-                App\GraphQL\Queries\Admin\AdminChallengesQuery::class,
-                App\GraphQL\Queries\Admin\AdminAchievementsQuery::class,
-                App\GraphQL\Queries\Admin\AdminPetItemsQuery::class,
-                App\GraphQL\Queries\Admin\AdminRemindersQuery::class,
-                App\GraphQL\Queries\Admin\AdminDailyRewardsQuery::class,
+                AdminSubscriptionsQuery::class,
+                AdminDailyTasksQuery::class,
+                AdminChallengesQuery::class,
+                AdminAchievementsQuery::class,
+                AdminPetItemsQuery::class,
+                AdminRemindersQuery::class,
+                AdminDailyRewardsQuery::class,
                 // Analytics
-                App\GraphQL\Queries\Admin\AdminDailyTaskAnalyticsQuery::class,
-                App\GraphQL\Queries\Admin\AdminChallengeAnalyticsQuery::class,
+                AdminDailyTaskAnalyticsQuery::class,
+                AdminChallengeAnalyticsQuery::class,
             ],
             'mutation' => [
                 // User management
-                App\GraphQL\Mutations\Admin\AdminCreateUserMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateUserMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpsertUserProfileMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeleteUserMutation::class,       // sudo_admin only
-                App\GraphQL\Mutations\Admin\AdminForceLogoutMutation::class,
+                AdminCreateUserMutation::class,
+                AdminUpdateUserMutation::class,
+                AdminUpsertUserProfileMutation::class,
+                AdminDeleteUserMutation::class,       // sudo_admin only
+                AdminForceLogoutMutation::class,
                 // Child stats
-                App\GraphQL\Mutations\Admin\AdminSetChildExpMutation::class,
-                App\GraphQL\Mutations\Admin\AdminAdjustExpMutation::class,
-                App\GraphQL\Mutations\Admin\AdminSetChildCoinsMutation::class,
-                App\GraphQL\Mutations\Admin\AdminAdjustCoinsMutation::class,
+                AdminSetChildExpMutation::class,
+                AdminAdjustExpMutation::class,
+                AdminSetChildCoinsMutation::class,
+                AdminAdjustCoinsMutation::class,
                 // Pet items
-                App\GraphQL\Mutations\Admin\AdminGrantPetItemToChildMutation::class,
-                App\GraphQL\Mutations\Admin\AdminRevokePetItemMutation::class,
-                App\GraphQL\Mutations\Admin\AdminClearPetItemsMutation::class,
+                AdminGrantPetItemToChildMutation::class,
+                AdminRevokePetItemMutation::class,
+                AdminClearPetItemsMutation::class,
                 // Family
-                App\GraphQL\Mutations\Admin\AdminLinkParentChildMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUnlinkParentChildMutation::class,
+                AdminLinkParentChildMutation::class,
+                AdminUnlinkParentChildMutation::class,
                 // Subscriptions
-                App\GraphQL\Mutations\Admin\AdminGrantSubscriptionMutation::class,
-                App\GraphQL\Mutations\Admin\AdminRevokeSubscriptionMutation::class,
+                AdminGrantSubscriptionMutation::class,
+                AdminRevokeSubscriptionMutation::class,
                 // Content management
-                App\GraphQL\Mutations\Admin\AdminCreateSubscriptionMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateSubscriptionMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeleteSubscriptionMutation::class,
-                App\GraphQL\Mutations\Admin\AdminCreateDailyTaskMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateDailyTaskMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeleteDailyTaskMutation::class,
-                App\GraphQL\Mutations\Admin\AdminCreateChallengeMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateChallengeMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeleteChallengeMutation::class,
-                App\GraphQL\Mutations\Admin\AdminCreateAchievementMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateAchievementMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeleteAchievementMutation::class,
-                App\GraphQL\Mutations\Admin\AdminCreatePetItemMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdatePetItemMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeletePetItemMutation::class,
-                App\GraphQL\Mutations\Admin\AdminCreateReminderMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateReminderMutation::class,
-                App\GraphQL\Mutations\Admin\AdminDeleteReminderMutation::class,
-                App\GraphQL\Mutations\Admin\AdminCreateDailyRewardMutation::class,
-                App\GraphQL\Mutations\Admin\AdminUpdateDailyRewardMutation::class,
+                AdminCreateSubscriptionMutation::class,
+                AdminUpdateSubscriptionMutation::class,
+                AdminDeleteSubscriptionMutation::class,
+                AdminCreateDailyTaskMutation::class,
+                AdminUpdateDailyTaskMutation::class,
+                AdminDeleteDailyTaskMutation::class,
+                AdminCreateChallengeMutation::class,
+                AdminUpdateChallengeMutation::class,
+                AdminDeleteChallengeMutation::class,
+                AdminCreateAchievementMutation::class,
+                AdminUpdateAchievementMutation::class,
+                AdminDeleteAchievementMutation::class,
+                AdminCreatePetItemMutation::class,
+                AdminUpdatePetItemMutation::class,
+                AdminDeletePetItemMutation::class,
+                AdminCreateReminderMutation::class,
+                AdminUpdateReminderMutation::class,
+                AdminDeleteReminderMutation::class,
+                AdminCreateDailyRewardMutation::class,
+                AdminUpdateDailyRewardMutation::class,
+                // Category management
+                AdminCreateDailyTaskCategoryMutation::class,
+                AdminUpdateDailyTaskCategoryMutation::class,
+                AdminDeleteDailyTaskCategoryMutation::class,
+                AdminCreateChallengeCategoryMutation::class,
+                AdminUpdateChallengeCategoryMutation::class,
+                AdminDeleteChallengeCategoryMutation::class,
+                AdminCreatePetItemCategoryMutation::class,
+                AdminUpdatePetItemCategoryMutation::class,
+                AdminDeletePetItemCategoryMutation::class,
                 // Media (admin can upload too)
-                App\GraphQL\Mutations\Account\RequestMediaUploadMutation::class,
-                App\GraphQL\Mutations\Account\ConfirmMediaUploadMutation::class,
+                RequestMediaUploadMutation::class,
+                ConfirmMediaUploadMutation::class,
             ],
             'types' => [],
             'middleware' => [
@@ -195,120 +408,133 @@ return [
     // The global types available to all schemas.
     'types' => [
         // ── Shared / error ───────────────────────────────────────────────────
-        App\GraphQL\Types\UserErrorType::class,
-        App\GraphQL\Types\Errors\ValidationFieldType::class,
-        App\GraphQL\Types\Errors\ValidationErrorType::class,
-        App\GraphQL\Types\Errors\RateLimitErrorType::class,
-        App\GraphQL\Types\Errors\InvalidActionErrorType::class,
-        App\GraphQL\Types\Errors\MutationErrorUnionType::class,
-        App\GraphQL\Types\MutationStatusType::class,
+        UserErrorType::class,
+        ValidationFieldType::class,
+        ValidationErrorType::class,
+        RateLimitErrorType::class,
+        InvalidActionErrorType::class,
+        MutationErrorUnionType::class,
+        MutationStatusType::class,
 
         // ── User & profile ───────────────────────────────────────────────────
-        App\GraphQL\Types\UserType::class,
-        App\GraphQL\Types\ProfileType::class,
+        UserType::class,
+        ProfileType::class,
 
         // ── Auth ─────────────────────────────────────────────────────────────
-        App\GraphQL\Types\SessionType::class,
-        App\GraphQL\Types\AccessTokenType::class,
-        App\GraphQL\Types\RefreshTokenType::class,
-        App\GraphQL\Types\AuthTokensType::class,
+        SessionType::class,
+        AccessTokenType::class,
+        RefreshTokenType::class,
+        AuthTokensType::class,
 
         // ── Media ────────────────────────────────────────────────────────────
-        App\GraphQL\Types\MediaType::class,
+        MediaType::class,
 
         // ── Game ─────────────────────────────────────────────────────────────
-        App\GraphQL\Types\RewardGrantType::class,
-        App\GraphQL\Types\WalletType::class,
-        App\GraphQL\Types\ExpType::class,
+        RewardGrantType::class,
+        WalletType::class,
+        ExpType::class,
 
         // ── Family ───────────────────────────────────────────────────────────
-        App\GraphQL\Types\FamilyLinkType::class,
-        App\GraphQL\Types\ChildLinkTokenType::class,
+        FamilyLinkType::class,
+        ChildLinkTokenType::class,
 
         // ── Daily tasks ──────────────────────────────────────────────────────
-        App\GraphQL\Types\DailyTaskCategoryType::class,
-        App\GraphQL\Types\DailyTaskType::class,
-        App\GraphQL\Types\DailyTaskAnalyticsPointType::class,
-        App\GraphQL\Types\ChildDailyTaskType::class,
+        DailyTaskCategoryType::class,
+        DailyTaskType::class,
+        DailyTaskAnalyticsPointType::class,
+        ChildDailyTaskType::class,
 
         // ── Challenges ───────────────────────────────────────────────────────
-        App\GraphQL\Types\ChallengeCategoryType::class,
-        App\GraphQL\Types\ChallengeType::class,
-        App\GraphQL\Types\ChallengeAnalyticsPointType::class,
-        App\GraphQL\Types\ChildChallengeType::class,
+        ChallengeCategoryType::class,
+        ChallengeType::class,
+        ChallengeAnalyticsPointType::class,
+        ChildChallengeType::class,
 
         // ── Achievements ─────────────────────────────────────────────────────
-        App\GraphQL\Types\AchievementRequirementsType::class,
-        App\GraphQL\Types\AchievementRequirementsInput::class,
-        App\GraphQL\Types\AchievementType::class,
-        App\GraphQL\Types\ChildAchievementType::class,
+        AchievementRequirementsType::class,
+        AchievementRequirementsInput::class,
+        AchievementType::class,
+        ChildAchievementType::class,
 
         // ── Daily rewards ────────────────────────────────────────────────────
-        App\GraphQL\Types\DailyRewardType::class,
+        DailyRewardType::class,
 
         // ── Reminders ────────────────────────────────────────────────────────
-        App\GraphQL\Types\ReminderType::class,
-        App\GraphQL\Types\ChildReminderType::class,
+        ReminderType::class,
+        ChildReminderType::class,
 
         // ── Pet shop ─────────────────────────────────────────────────────────
-        App\GraphQL\Types\PetItemCategoryType::class,
-        App\GraphQL\Types\PetItemType::class,
-        App\GraphQL\Types\ChildPetItemType::class,
+        PetItemCategoryType::class,
+        PetItemType::class,
+        ChildPetItemType::class,
 
         // ── Subscriptions & payments ─────────────────────────────────────────
-        App\GraphQL\Types\SubscriptionType::class,
-        App\GraphQL\Types\UserSubscriptionType::class,
-        App\GraphQL\Types\PaymentType::class,
+        SubscriptionType::class,
+        UserSubscriptionType::class,
+        PaymentType::class,
 
         // ── Child cabinet / progress ────────────────────────────────────────
-        App\GraphQL\Types\ChildCabinetType::class,
-        App\GraphQL\Types\ChildProgressSummaryType::class,
+        ChildCabinetType::class,
+        ChildProgressSummaryType::class,
 
         // ── Payload types (app/GraphQL/Types/Payloads/) ──────────────────────
-        App\GraphQL\Types\Payloads\MutationPayloadType::class,
-        App\GraphQL\Types\Payloads\AuthPayloadType::class,
-        App\GraphQL\Types\Payloads\UpsertProfilePayloadType::class,
-        App\GraphQL\Types\Payloads\RequestMediaUploadPayloadType::class,
-        App\GraphQL\Types\Payloads\ConfirmMediaUploadPayloadType::class,
-        App\GraphQL\Types\Payloads\CreateChildLinkTokenPayloadType::class,
-        App\GraphQL\Types\Payloads\LinkChildByTokenPayloadType::class,
-        App\GraphQL\Types\Payloads\FamilyLinkPayloadType::class,
-        App\GraphQL\Types\Payloads\DailyTaskPayloadType::class,
-        App\GraphQL\Types\Payloads\ChildDailyTaskPayloadType::class,
-        App\GraphQL\Types\Payloads\ClaimDailyTaskRewardPayloadType::class,
-        App\GraphQL\Types\Payloads\ChallengePayloadType::class,
-        App\GraphQL\Types\Payloads\ChildChallengePayloadType::class,
-        App\GraphQL\Types\Payloads\ClaimChallengeRewardPayloadType::class,
-        App\GraphQL\Types\Payloads\AchievementPayloadType::class,
-        App\GraphQL\Types\Payloads\ClaimAchievementRewardPayloadType::class,
-        App\GraphQL\Types\Payloads\DailyRewardPayloadType::class,
-        App\GraphQL\Types\Payloads\ClaimDailyRewardPayloadType::class,
-        App\GraphQL\Types\Payloads\ReminderPayloadType::class,
-        App\GraphQL\Types\Payloads\PetItemPayloadType::class,
-        App\GraphQL\Types\Payloads\PurchasePetItemPayloadType::class,
-        App\GraphQL\Types\Payloads\ChildPetItemPayloadType::class,
-        App\GraphQL\Types\Payloads\SubscriptionPayloadType::class,
-        App\GraphQL\Types\Payloads\PaymentPayloadType::class,
-        App\GraphQL\Types\Payloads\UserPayloadType::class,
-        App\GraphQL\Types\Payloads\ExpPayloadType::class,
-        App\GraphQL\Types\Payloads\WalletPayloadType::class,
+        MutationPayloadType::class,
+        AuthPayloadType::class,
+        UpsertProfilePayloadType::class,
+        RequestMediaUploadPayloadType::class,
+        ConfirmMediaUploadPayloadType::class,
+        CreateChildLinkTokenPayloadType::class,
+        LinkChildByTokenPayloadType::class,
+        FamilyLinkPayloadType::class,
+        DailyTaskPayloadType::class,
+        ChildDailyTaskPayloadType::class,
+        ClaimDailyTaskRewardPayloadType::class,
+        ChallengePayloadType::class,
+        ChildChallengePayloadType::class,
+        ClaimChallengeRewardPayloadType::class,
+        AchievementPayloadType::class,
+        ClaimAchievementRewardPayloadType::class,
+        DailyRewardPayloadType::class,
+        ClaimDailyRewardPayloadType::class,
+        ReminderPayloadType::class,
+        PetItemPayloadType::class,
+        PurchasePetItemPayloadType::class,
+        ChildPetItemPayloadType::class,
+        SubscriptionPayloadType::class,
+        PaymentPayloadType::class,
+        UserPayloadType::class,
+        ExpPayloadType::class,
+        WalletPayloadType::class,
+        DailyTaskCategoryPayloadType::class,
+        ChallengeCategoryPayloadType::class,
+        PetItemCategoryPayloadType::class,
     ],
 
-    'error_formatter' => [App\GraphQL\Support\ErrorFormatter::class, 'format'],
+    'error_formatter' => [ErrorFormatter::class, 'format'],
 
-    'errors_handler' => [Rebing\GraphQL\GraphQL::class, 'handleErrors'],
+    'errors_handler' => [GraphQL::class, 'handleErrors'],
 
+    /*
+     * UserType exposes `children` and `parents` as lists of User, so the schema
+     * is self-referential: without a depth cap a single request can nest
+     * me { children { parents { children { … } } } } arbitrarily deep and turn
+     * into a database amplification attack.
+     *
+     * Depth 15 clears the deepest legitimate query (~6) with room to spare and
+     * still admits the standard introspection query (~12), which would break at
+     * a tighter limit while introspection stays enabled.
+     */
     'security' => [
-        'query_max_complexity' => null,
-        'query_max_depth' => null,
-        'disable_introspection' => false,
+        'query_max_complexity' => (int) env('GRAPHQL_MAX_COMPLEXITY', 1000),
+        'query_max_depth' => (int) env('GRAPHQL_MAX_DEPTH', 15),
+        'disable_introspection' => (bool) env('GRAPHQL_DISABLE_INTROSPECTION', false),
     ],
 
-    'pagination_type' => Rebing\GraphQL\Support\PaginationType::class,
+    'pagination_type' => PaginationType::class,
 
-    'simple_pagination_type' => Rebing\GraphQL\Support\SimplePaginationType::class,
+    'simple_pagination_type' => SimplePaginationType::class,
 
-    'cursor_pagination_type' => Rebing\GraphQL\Support\CursorPaginationType::class,
+    'cursor_pagination_type' => CursorPaginationType::class,
 
     'defaultFieldResolver' => null,
 
@@ -319,14 +545,14 @@ return [
     'apq' => [
         'enable' => env('GRAPHQL_APQ_ENABLE', false),
         'cache_driver' => env('GRAPHQL_APQ_CACHE_DRIVER', config('cache.default')),
-        'cache_prefix' => config('cache.prefix') . ':graphql.apq',
+        'cache_prefix' => config('cache.prefix').':graphql.apq',
         'cache_ttl' => 300,
     ],
 
     'execution_middleware' => [
-        Rebing\GraphQL\Support\ExecutionMiddleware\ValidateOperationParamsMiddleware::class,
-        Rebing\GraphQL\Support\ExecutionMiddleware\AutomaticPersistedQueriesMiddleware::class,
-        Rebing\GraphQL\Support\ExecutionMiddleware\AddAuthUserContextValueMiddleware::class,
+        ValidateOperationParamsMiddleware::class,
+        AutomaticPersistedQueriesMiddleware::class,
+        AddAuthUserContextValueMiddleware::class,
     ],
 
     'resolver_middleware_append' => [],

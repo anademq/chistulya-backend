@@ -34,6 +34,10 @@ class AdminPetItemsQuery extends AdminQuery
                 'defaultValue' => 30,
                 'description' => 'Number of items per page (max 100). Defaults to 30.',
             ],
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Optional category ID to filter items by.',
+            ],
         ];
     }
 
@@ -41,9 +45,11 @@ class AdminPetItemsQuery extends AdminQuery
     {
         $page = max(1, (int) ($args['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($args['per_page'] ?? 30)));
+        $categoryId = isset($args['category_id']) ? (int) $args['category_id'] : null;
 
         return PetItem::query()
             ->withTrashed()
+            ->when($categoryId !== null, fn ($query) => $query->where('category_id', $categoryId))
             ->orderByDesc('created_at')
             ->paginate($perPage, ['*'], 'page', $page);
     }

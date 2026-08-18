@@ -9,6 +9,7 @@ use App\GraphQL\Mutations\ChildAuthedMutation;
 use App\Models\Reminder;
 use App\Models\User;
 use App\Services\ReminderService;
+use App\Support\ExistingRecord;
 use GraphQL\Type\Definition\Type;
 use Illuminate\Validation\Rule;
 use Rebing\GraphQL\Support\Facades\GraphQL;
@@ -97,9 +98,12 @@ class UpdateReminderMutation extends ChildAuthedMutation
         $user = auth()->user();
 
         return $this->wrapPayload(function () use ($user, $args): array {
-            $reminder = Reminder::where('id', $args['reminder_id'])
-                ->where('created_by', $user->id)
-                ->firstOrFail();
+            $reminder = ExistingRecord::require(
+                Reminder::where('id', $args['reminder_id'])
+                    ->where('created_by', $user->id)
+                    ->first(),
+                'reminder_id',
+            );
 
             return ['reminder' => app(ReminderService::class)->update($user, $reminder, $args)];
         });

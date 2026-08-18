@@ -33,9 +33,9 @@ class AdminChallengeAnalyticsQuery extends AdminQuery
                 'defaultValue' => 6,
                 'description' => 'Number of past months to include (1–12). Defaults to 6.',
             ],
-            'category' => [
-                'type' => Type::string(),
-                'description' => 'Filter by challenge category slug.',
+            'category_id' => [
+                'type' => Type::int(),
+                'description' => 'Filter by challenge category id.',
             ],
         ];
     }
@@ -47,7 +47,7 @@ class AdminChallengeAnalyticsQuery extends AdminQuery
         return app(AnalyticsService::class)->challengesByLastMonths(
             $child,
             max(1, min(12, (int) ($args['months'] ?? 6))),
-            $args['category'] ?? null
+            isset($args['category_id']) ? (int) $args['category_id'] : null
         );
     }
 }

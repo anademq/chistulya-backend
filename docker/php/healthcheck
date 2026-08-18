@@ -1,0 +1,13 @@
+#!/bin/bash
+# Container healthcheck for the php-fpm role.
+#
+# The old check ran `php-fpm -t`, which only validates the config file — it
+# reports healthy while the pool is deadlocked or every child is busy. This
+# speaks FastCGI to the socket the way nginx does, so it fails when real
+# requests would fail.
+set -euo pipefail
+
+SCRIPT_NAME=/ping \
+SCRIPT_FILENAME=/ping \
+REQUEST_METHOD=GET \
+cgi-fcgi -bind -connect 127.0.0.1:9000 2>/dev/null | grep -q pong

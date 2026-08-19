@@ -1,6 +1,5 @@
 COMPOSE      := docker compose
-APP          := $(COMPOSE) exec -T app
-APP_ROOT     := $(COMPOSE) exec -T -u root app
+APP          := $(COMPOSE) exec app
 BACKUP_DIR   := ./backups
 STAMP        := $(shell date +%Y%m%d-%H%M%S)
 

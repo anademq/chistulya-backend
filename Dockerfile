@@ -1,23 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Stage 1 — compile the PHP extensions.
+# Stage 1 — PHP with every extension the application needs.
 # ──────────────────────────────────────────────────────────────────────────────
-FROM php:8.3-fpm-alpine AS extensions
+FROM php:8.3-fpm-alpine AS base
 
-RUN apk add --no-cache --virtual .build-deps \
-    $PHPIZE_DEPS \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libzip-dev \
-    icu-dev \
-    postgresql-dev \
-    oniguruma-dev \
-    imagemagick-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" \
-    pdo \
+COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
+
+RUN install-php-extensions \
     pdo_pgsql \
     pgsql \
     mbstring \
@@ -28,19 +18,15 @@ RUN apk add --no-cache --virtual .build-deps \
     zip \
     intl \
     opcache \
-    && pecl install redis imagick \
-    && docker-php-ext-enable redis imagick \
-    && apk del .build-deps \
-    && rm -rf /tmp/pear /var/cache/apk/*
+    && rm -f /usr/local/bin/install-php-extensions \
+    && rm -rf /tmp/* /var/cache/apk/*
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 2 — resolve the Composer dependency tree.
 # ──────────────────────────────────────────────────────────────────────────────
-FROM php:8.3-fpm-alpine AS vendor
+FROM base AS vendor
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-COPY --from=extensions /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
-COPY --from=extensions /usr/local/etc/php/conf.d/     /usr/local/etc/php/conf.d/
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
@@ -60,7 +46,7 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 3 — runtime.
 # ──────────────────────────────────────────────────────────────────────────────
-FROM php:8.3-fpm-alpine AS runtime
+FROM base AS runtime
 
 ARG APP_VERSION="dev"
 ARG BUILD_DATE=""
@@ -79,18 +65,7 @@ RUN apk add --no-cache \
     su-exec \
     fcgi \
     postgresql-client \
-    libpng \
-    libjpeg-turbo \
-    freetype \
-    libzip \
-    icu-libs \
-    libpq \
-    oniguruma \
-    imagemagick \
     && rm -rf /var/cache/apk/*
-
-COPY --from=extensions /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
-COPY --from=extensions /usr/local/etc/php/conf.d/     /usr/local/etc/php/conf.d/
 
 COPY docker/php/production.ini /usr/local/etc/php/conf.d/99-production.ini
 # zzz- so it sorts after the image own zz-docker.conf and wins the merge.

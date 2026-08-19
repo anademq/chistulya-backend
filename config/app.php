@@ -129,11 +129,11 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    'frontend_url' => env('APP_FRONTEND_URL', 'http://localhost:3000'),
 
     'frontend_routes' => [
-        'verify_email' => env('FRONTEND_ROUTE_VERIFY_EMAIL', '/verify-email'),
-        'reset_password' => env('FRONTEND_ROUTE_RESET_PASSWORD', '/reset-password'),
+        'verify_email' => env('APP_FRONTEND_ROUTE_VERIFY_EMAIL', '/verify-email'),
+        'reset_password' => env('APP_FRONTEND_ROUTE_RESET_PASSWORD', '/reset-password'),
     ],
 
 ];

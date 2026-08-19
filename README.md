@@ -66,7 +66,7 @@ make check
 Выпустить сертификат (без него nginx не стартует):
 
 ```bash
-certbot certonly --webroot -w /var/www/certbot \
+certbot certonly --webroot -w /var/www/ssl \
   -d api.xn--h1agrefu5d.xn--p1ai \
   -d storage.xn--h1agrefu5d.xn--p1ai
 ```

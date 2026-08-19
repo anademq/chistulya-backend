@@ -461,8 +461,12 @@ bootstrap/app.php  # алиасы middleware, подключение роуто�
 
 ## 18. Соглашения разработки
 
+Установить MCP / Skills:
+```bash
+php artisan boost:install
+```
+
 Из Laravel Boost guidelines:
-- Установить MCP / Skills: `php artisan boost:install`
 - PHP 8: promoted constructor properties, строгие типы возвратов/параметров, всегда фигурные скобки, PHPDoc с array-shape, TitleCase для ключей enum.
 - Создавать файлы через `php artisan make:*` с `--no-interaction`; generic-классы — `make:class`.
 - Все GraphQL-типы/операции регистрируются в `config/graphql.php`.

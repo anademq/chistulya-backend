@@ -105,7 +105,7 @@ class StorageProvision extends Command
                 ],
             ]);
         } catch (AwsException $e) {
-            if (! in_array($e->getAwsErrorCode(), ['NotImplemented', 'MethodNotAllowed'], true)) {
+            if (! in_array($e->getAwsErrorCode(), ['NotImplemented', 'MethodNotAllowed', 'MalformedXML'], true)) {
                 throw $e;
             }
 
